@@ -460,6 +460,7 @@ public class LanguageModelFacilitator(
             settingsValues.mIsNumberRowEnabled
         )
 
+        lastTapStripForced = suggestionResults.mForceAutoCorrection
         if(context.getSetting(TapShapeRerankSetting)) {
             tapShapeReranked(values, suggestedWords, suggestionResults.mForceAutoCorrection)?.let { return it }
         }
@@ -587,6 +588,72 @@ public class LanguageModelFacilitator(
     private fun tapShapeReranked(values: PredictionInputValues, words: SuggestedWords, forced: Boolean): SuggestedWords? {
         val composed = values.composedData
         if(composed.mIsBatchMode || words.isPrediction || words.size() < 2) return null
+        val (tx, ty, keys) = tapGeometry(values) ?: return null
+
+        val list = words.mSuggestedWordInfoList
+        val tapScores = DoubleArray(list.size)
+        val pick = TapShapeReranker.choose(
+            tx, ty, keys,
+            Array(list.size) { list[it].mWord }, IntArray(list.size) { list[it].mScore },
+            if(words.mWillAutoCorrect) 1 else 0, words.mTypedWordValid, tapScores
+        )
+        val top4 = list.indices.filter { !tapScores[it].isNaN() }.sortedByDescending { tapScores[it] }.take(4)
+        org.futo.inputmethod.latin.LastTapShapeScores.set(top4.map { list[it].mWord }, top4.map { tapScores[it] })
+        if(pick < 0) return null
+        if(forced) return null
+        return committing(words, pick)
+    }
+
+    /** Whether the last tap strip's word was forced by another correction (swapped letters, copula -ing, taught word). */
+    @Volatile private var lastTapStripForced = false
+
+    /**
+     * TapLmReranker, after 09: re-picks the tap word with 09's tap fit plus main-dictionary
+     * frequency and p(first token | previous words) from the transformer (TapLmReranker). One
+     * rescoreSuggestionsNative call per tap update, as the transformer swipe re-score makes per swipe. Null keeps the strip.
+     */
+    suspend fun tapLmReranked(values: PredictionInputValues, words: SuggestedWords): SuggestedWords? {
+        if(!context.getSetting(TapLmRerankSetting)) return null
+        val composed = values.composedData
+        if(composed.mIsBatchMode || words.isPrediction || words.size() < 2 || lastTapStripForced) return null
+        val list = words.mSuggestedWordInfoList
+        val chosen = if(words.mWillAutoCorrect) 1 else 0
+        if(list[chosen].mWord.contains(' ')) return null
+        val (tx, ty, keys) = tapGeometry(values) ?: return null
+
+        val model = languageModel ?: return null
+        if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
+        val probs = withTimeoutOrNull(TAP_LM_TIMEOUT_MS) {
+            model.firstTokenProbabilities(list.map { it.mWord }, values.ngramContext)
+        } ?: return null
+
+        val freq = IntArray(list.size) {
+            val w = list[it].mWord
+            maxOf(dictionaryFacilitator.getMainDictionaryFrequencyIgnoringCase(w),
+                dictionaryFacilitator.getMainDictionaryFrequencyIgnoringCase(w.lowercase()))
+        }
+        val pick = org.futo.inputmethod.latin.TapLmReranker.choose(
+            tx, ty, keys,
+            Array(list.size) { list[it].mWord }, IntArray(list.size) { list[it].mScore },
+            composed.mTypedWord, chosen, words.mTypedWordValid, freq, probs
+        )
+        if(pick < 0) return null
+        return committing(words, pick)
+    }
+
+    /** The strip with [pick] as the word space commits (index 0 is the typed word, 1 the correction). */
+    private fun committing(words: SuggestedWords, pick: Int): SuggestedWords {
+        val reordered = ArrayList(words.mSuggestedWordInfoList)
+        if(pick > 1) reordered.add(1, reordered.removeAt(pick))
+        return SuggestedWords(
+            reordered, words.mRawSuggestions, words.mTypedWordInfo, words.mTypedWordValid,
+            pick != 0, words.mIsObsoleteSuggestions, words.mInputStyle, words.mSequenceNumber
+        )
+    }
+
+    /** Tap positions and letter key centres in key pitches, the units TapShapeReranker and 23 were fitted in. */
+    private fun tapGeometry(values: PredictionInputValues): Triple<FloatArray, FloatArray, Map<Char, FloatArray>>? {
+        val composed = values.composedData
         val keyboard = keyboardSwitcher.keyboard ?: return null
 
         val centres = HashMap<Char, FloatArray>()
@@ -618,26 +685,7 @@ public class LanguageModelFacilitator(
             ty.add(ys[i] / keyHeight)
         }
         if(tx.isEmpty()) return null
-
-        val list = words.mSuggestedWordInfoList
-        val tapScores = DoubleArray(list.size)
-        val pick = TapShapeReranker.choose(
-            tx.toFloatArray(), ty.toFloatArray(), keys,
-            Array(list.size) { list[it].mWord }, IntArray(list.size) { list[it].mScore },
-            if(words.mWillAutoCorrect) 1 else 0, words.mTypedWordValid, tapScores
-        )
-        val top4 = list.indices.filter { !tapScores[it].isNaN() }.sortedByDescending { tapScores[it] }.take(4)
-        org.futo.inputmethod.latin.LastTapShapeScores.set(top4.map { list[it].mWord }, top4.map { tapScores[it] })
-        if(pick < 0) return null
-        if(forced) return null
-
-        // Index 0 is the typed word; the word at index 1 is committed when willAutoCorrect is set
-        val reordered = ArrayList(list)
-        if(pick > 1) reordered.add(1, reordered.removeAt(pick))
-        return SuggestedWords(
-            reordered, words.mRawSuggestions, words.mTypedWordInfo, words.mTypedWordValid,
-            pick != 0, words.mIsObsoleteSuggestions, words.mInputStyle, words.mSequenceNumber
-        )
+        return Triple(tx.toFloatArray(), ty.toFloatArray(), keys)
     }
 
     // This method should return null if transformer is disabled by settings or locale
@@ -1020,3 +1068,15 @@ val TapShapeRerankSetting = SettingsKey(
     booleanPreferencesKey("tap_shape_rerank"),
     true
 )
+
+// TapLmReranker, off by default: after 09, re-pick the tap word with tap fit, dictionary
+// frequency and the transformer's p(word | previous words). Two-fold on the host's simulated taps:
+// 101 fixed, 9 broken of 5,998; tap-scale cases 115 fixed, 12 broken. Costs one transformer call per
+// tap update (host median 27 ms); needs the the transformer swipe re-score timing run before enabling.
+val TapLmRerankSetting = SettingsKey(
+    booleanPreferencesKey("tap_lm_rerank"),
+    false
+)
+
+/** TapLmReranker waits this long for the transformer, then keeps the strip. */
+const val TAP_LM_TIMEOUT_MS = 150L

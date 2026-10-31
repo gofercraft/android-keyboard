@@ -943,6 +943,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             subtitle = R.string.typing_settings_tap_shape_rerank_subtitle,
             setting = org.futo.inputmethod.latin.xlm.TapShapeRerankSetting
         ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_tap_lm_rerank,
+            subtitle = R.string.typing_settings_tap_lm_rerank_subtitle,
+            setting = org.futo.inputmethod.latin.xlm.TapLmRerankSetting
+        ),
         userSettingToggleSharedPrefs(
             title = R.string.typing_settings_delete_pasted_text_on_backspace,
             key = Settings.PREF_BACKSPACE_DELETE_INSERTED_TEXT,

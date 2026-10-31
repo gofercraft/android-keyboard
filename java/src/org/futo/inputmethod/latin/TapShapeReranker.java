@@ -114,7 +114,7 @@ public final class TapShapeReranker {
     }
 
     /** Fills f[5..14] with the alignment features; false when the word has no letter keys. */
-    private static boolean geometry(final float[] tx, final float[] ty, final int n,
+    static boolean geometry(final float[] tx, final float[] ty, final int n,
                                     final Map<Character, float[]> keys, final String word, final float[] f) {
         final List<float[]> letters = new ArrayList<>();
         final String lw = word.toLowerCase(Locale.ROOT);

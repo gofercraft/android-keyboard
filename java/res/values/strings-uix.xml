@@ -495,6 +495,8 @@
     <string name="typing_settings_stray_space_merge_subtitle">"atta cked" becomes "attacked" when the pieces are not both words. Backspace undoes it</string>
     <string name="typing_settings_tap_shape_rerank">Use where you tapped</string>
     <string name="typing_settings_tap_shape_rerank_subtitle">Pick the suggestion whose keys best match where your taps landed</string>
+    <string name="typing_settings_tap_lm_rerank">Use word frequency and context for taps</string>
+    <string name="typing_settings_tap_lm_rerank_subtitle">Also weigh how common each suggestion is and how well it follows the previous words. Uses the transformer once per key press</string>
 
     <!-- Misc keyboard settings -->
     <string name="keyboard_settings_title">Keyboard</string>

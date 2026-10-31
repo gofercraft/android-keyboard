@@ -564,7 +564,8 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
                     lmResult
                 )
                 if(processed != null) {
-                    onGetSuggestedWords(processed, inputStyle, sequenceNumber)
+                    val reranked = languageModelFacilitator.tapLmReranked(predictionInputValues, processed)
+                    onGetSuggestedWords(reranked ?: processed, inputStyle, sequenceNumber)
                 } else {
                     throwIfDebug(IllegalStateException(
                         "The processAndMergeSuggestions method should not typically return null"

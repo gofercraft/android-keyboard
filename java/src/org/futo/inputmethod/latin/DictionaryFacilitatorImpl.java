@@ -1009,6 +1009,20 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         return maxFreq;
     }
 
+    @Override
+    public int getMainDictionaryFrequencyIgnoringCase(final String word) {
+        if (TextUtils.isEmpty(word)) {
+            return Dictionary.NOT_A_PROBABILITY;
+        }
+        int maxFreq = Dictionary.NOT_A_PROBABILITY;
+        for(DictionaryGroup dictionaryGroup : mDictionaryGroups) {
+            final Dictionary main = dictionaryGroup.getDict(Dictionary.TYPE_MAIN);
+            if (main == null) continue;
+            maxFreq = Math.max(maxFreq, main.getMaxFrequencyOfExactMatches(word));
+        }
+        return maxFreq;
+    }
+
     private boolean isValidWord(final String word, final String[] dictionariesToCheck) {
         if (TextUtils.isEmpty(word)) {
             return false;
