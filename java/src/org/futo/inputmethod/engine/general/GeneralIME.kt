@@ -216,9 +216,10 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
         org.futo.inputmethod.latin.PreviousSwipeRevision.engine = engine@{ request ->
             val r = org.futo.inputmethod.latin.PreviousSwipeRevision
             val offers = context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSetting)
+            val tapAuto = org.futo.inputmethod.latin.TapRevision.isEnabled(context)
             val useful = if(request.swiped) r.isEnabled(context)
                     || (offers && context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSwipedSetting))
-                else offers
+                else offers || tapAuto
             if(!useful) return@engine
             // Not on languageModelScope: each model call takes that thread on its own, so the
             // next word's keystrokes can run between them. The next keystroke cancels it.
@@ -226,7 +227,7 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
             r.pending = helper.lifecycleScope.launch(Dispatchers.Default) {
                 val decision = languageModelFacilitator.previousWordDecision(request) ?: return@launch
                 withContext(Dispatchers.Main) {
-                    if(decision.auto && org.futo.inputmethod.latin.PreviousSwipeRevision.isEnabled(context)) {
+                    if(decision.auto && (if(request.swiped) org.futo.inputmethod.latin.PreviousSwipeRevision.isEnabled(context) else tapAuto)) {
                         inputLogic.applySwipeRevision(request, decision.word)
                     } else if(context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSetting)
                         && (!request.swiped || context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSwipedSetting))

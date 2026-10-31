@@ -919,6 +919,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             setting = org.futo.inputmethod.latin.TaughtWordBoostSetting
         ),
         userSettingToggleDataStore(
+            title = R.string.typing_settings_previous_tap_revision,
+            subtitle = R.string.typing_settings_previous_tap_revision_subtitle,
+            setting = org.futo.inputmethod.latin.TapRevisionSetting
+        ),
+        userSettingToggleDataStore(
             title = R.string.typing_settings_apostrophe_pairs,
             subtitle = R.string.typing_settings_apostrophe_pairs_subtitle,
             setting = org.futo.inputmethod.latin.ApostrophePairsSetting

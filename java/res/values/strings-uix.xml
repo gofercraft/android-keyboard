@@ -485,6 +485,8 @@
     <string name="typing_settings_auto_space_mode_none2">Disabled (not recommended)</string>
     <string name="typing_settings_taught_word_boost">Keep words you have taught</string>
     <string name="typing_settings_taught_word_boost_subtitle">Names and words you have typed and kept beat similar dictionary words, such as Niamh over Miami</string>
+    <string name="typing_settings_previous_tap_revision">Fix the previous typed word</string>
+    <string name="typing_settings_previous_tap_revision_subtitle">After the next word, change a typed word that was clearly meant as another, such as if to of. Backspace undoes it</string>
     <string name="typing_settings_apostrophe_pairs">Add or drop a missing apostrophe from context</string>
     <string name="typing_settings_apostrophe_pairs_subtitle">Words like well and its are checked against the sentence and changed when the language model is sure. Backspace undoes it</string>
     <string name="typing_settings_missed_space_split">Split words joined by a missed space</string>

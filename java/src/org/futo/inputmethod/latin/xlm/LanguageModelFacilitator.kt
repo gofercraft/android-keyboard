@@ -891,11 +891,27 @@ public class LanguageModelFacilitator(
             .sortedByDescending { partial[it] }.take(o.NEXT_SCORED_OTHERS)
         if(others.isEmpty()) return null
         val scores = DoubleArray(words.size) { Double.NEGATIVE_INFINITY }
+        val lnNext = DoubleArray(words.size)
         for(i in others + current) {
             val pNext = model.firstTokenProbabilitiesForContext(
                 listOf(request.next), request.context + " " + words[i]
             )?.get(0) ?: return null
-            scores[i] = partial[i] + w2 * ln(maxOf(pNext, 1e-9f).toDouble())
+            lnNext[i] = ln(maxOf(pNext, 1e-9f).toDouble())
+            scores[i] = partial[i] + w2 * lnNext[i]
+        }
+        // TapRevision: a tapped dictionary word is replaced on a clear win
+        if(!request.swiped && org.futo.inputmethod.latin.TapRevision.isEnabled(context)
+            && (dictionaryFacilitator.isValidSpellingWord(request.original)
+                || dictionaryFacilitator.isValidSpellingWord(request.original.lowercase()))) {
+            val t = org.futo.inputmethod.latin.TapRevision
+            val autoScore = { i: Int -> shape[i] + t.WORD_WEIGHT * ln(maxOf(pWord[i], 1e-9f).toDouble()) + t.NEXT_WEIGHT * lnNext[i] }
+            val b = others.maxByOrNull { autoScore(it) }
+            if(b != null && autoScore(b) - autoScore(current) >= t.AUTO_MIN_LEAD) {
+                val word = words[b].let {
+                    if(request.original.first().isUpperCase() && it.first().isLowerCase()) it.replaceFirstChar { c -> c.titlecase() } else it
+                }
+                return org.futo.inputmethod.latin.PreviousWordDecision(word, true)
+            }
         }
         val bestIndex = others.maxByOrNull { scores[it] } ?: return null
         val lead = scores[bestIndex] - scores[current]
