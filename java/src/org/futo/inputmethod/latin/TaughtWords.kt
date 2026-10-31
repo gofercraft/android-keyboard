@@ -17,6 +17,12 @@ val TaughtWordBoostSetting = SettingsKey(
     true
 )
 
+/** Swipes: weight the user-history trie above the main dictionary (TaughtWords.HISTORY_TRIE_WEIGHT). */
+val HistorySwipeWeightSetting = SettingsKey(
+    booleanPreferencesKey("history_swipe_weight"),
+    true
+)
+
 object TaughtWords {
     /** User-history commits before a word counts as taught. */
     const val MIN_KEPT = 2
@@ -34,6 +40,17 @@ object TaughtWords {
 
     /** Swipes: promote when the taught word's SwipeShapeReranker score is within this of the first word's. */
     const val SWIPE_MARGIN = 2.0
+
+    /**
+     * Swipes: the swipe decoder's weight for the user-history trie, times the locale's weight (1 for
+     * the main language). Engine week sweep on FUTO's neural decoder:
+     * at 1.5 swiped new words go from 18 to 32 of 65 and ordinary swipes from 869 to 873 of 954; at 2
+     * ordinary swipes fall to 836 (words used earlier steal swipes: for -> four, that -> what).
+     */
+    const val HISTORY_TRIE_WEIGHT = 1.5f
+
+    @JvmStatic fun isHistorySwipeWeightEnabled(context: Context): Boolean =
+        context.getSetting(HistorySwipeWeightSetting)
 
     /** Set by the dictionary facilitator: whether a word is taught. */
     @Volatile @JvmStatic var checker: java.util.function.Predicate<String>? = null

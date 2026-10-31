@@ -1110,6 +1110,8 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
     private boolean mPrevBadWordsAllowed = false;
     private Keyboard mPrevKeyboard = null;
     private ArrayList<DictionaryGroup> mTrieCorrespondingGroups;
+    // TaughtWords: which swipe tries come from user history
+    private ArrayList<Boolean> mTrieIsUserHistory;
 
     private float[] getTrieWeights() {
         if(mTrieCorrespondingGroups == null) return new float[0];
@@ -1119,6 +1121,11 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
 
         for(int i=0; i<size; i++) {
             result[i] = mTrieCorrespondingGroups.get(i).mWeightForGesturingInLocale;
+            if (mTrieIsUserHistory != null && i < mTrieIsUserHistory.size()
+                    && mTrieIsUserHistory.get(i) && swipeDecoderDictionary != null
+                    && TaughtWords.isHistorySwipeWeightEnabled(swipeDecoderDictionary.getContext())) {
+                result[i] *= TaughtWords.HISTORY_TRIE_WEIGHT;
+            }
         }
 
         return result;
@@ -1161,20 +1168,23 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
             ArrayList<Long> trieArray = new ArrayList<>();
 
             mTrieCorrespondingGroups = new ArrayList<>();
+            mTrieIsUserHistory = new ArrayList<>();
 
             for(DictionaryGroup group : mDictionaryGroups) {
-                int prevLength = trieArray.size();
-                ArrayList<Dictionary> dicts = new ArrayList<Dictionary>();
-                dicts.add(group.getDict(Dictionary.TYPE_MAIN));
-                dicts.add(group.getDict(Dictionary.TYPE_USER));
-                dicts.add(group.getDict(Dictionary.TYPE_USER_HISTORY));
-                dicts.add(group.getDict(Dictionary.TYPE_SUPPLEMENT));
+                final String[] types = { Dictionary.TYPE_MAIN, Dictionary.TYPE_USER,
+                        Dictionary.TYPE_USER_HISTORY, Dictionary.TYPE_SUPPLEMENT };
+                for(final String type : types) {
+                    int prevLength = trieArray.size();
+                    ArrayList<Dictionary> dicts = new ArrayList<Dictionary>();
+                    dicts.add(group.getDict(type));
 
-                addDictionaryTries(dicts, info.getLetters(), trieArray, allowBadWords);
-                int newLength = trieArray.size();
+                    addDictionaryTries(dicts, info.getLetters(), trieArray, allowBadWords);
+                    int newLength = trieArray.size();
 
-                for(int i=0; i<(newLength - prevLength); i++) {
-                    mTrieCorrespondingGroups.add(group);
+                    for(int i=0; i<(newLength - prevLength); i++) {
+                        mTrieCorrespondingGroups.add(group);
+                        mTrieIsUserHistory.add(Dictionary.TYPE_USER_HISTORY.equals(type));
+                    }
                 }
             }
 

@@ -228,6 +228,12 @@ val SwipeMenu = UserSettingsMenu(
         ),
 
         org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_history_weight,
+            subtitle = R.string.swipe_settings_history_weight_subtitle,
+            setting = org.futo.inputmethod.latin.HistorySwipeWeightSetting,
+        ),
+
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
             title = R.string.swipe_settings_shape_strict,
             subtitle = R.string.swipe_settings_shape_strict_subtitle,
             setting = org.futo.inputmethod.latin.SwipeShapeStrictSetting,
