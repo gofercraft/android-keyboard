@@ -383,10 +383,14 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
                 )
             }
         }
-        val order = SwipeShapeReranker.rerank(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
+        val reranked = SwipeShapeReranker.rerank(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
         val sortedScores = scores.sortedDescending()
         val shapeScores = SwipeShapeReranker.scores(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
-        LastSwipeShapeScores.set(order.take(4).map { words[it] }, order.take(4).map { shapeScores[it] })
+        val promoted = if(TaughtWords.isEnabled(context)) TaughtWords.promoteSwipe(reranked, words, shapeScores) else null
+        val order = promoted ?: reranked
+        // A promoted taught word is not re-scored (10) or revised (11): the LM rarely knows it
+        if(promoted != null) LastSwipeShapeScores.set(emptyList(), emptyList())
+        else LastSwipeShapeScores.set(order.take(4).map { words[it] }, order.take(4).map { shapeScores[it] })
         return order.take(4).mapIndexed { rank, i -> words[i] to sortedScores[rank] }
     }
 

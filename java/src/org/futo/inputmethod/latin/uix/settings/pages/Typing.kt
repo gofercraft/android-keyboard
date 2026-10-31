@@ -908,6 +908,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             }
         ),
         userSettingToggleDataStore(
+            title = R.string.typing_settings_taught_word_boost,
+            subtitle = R.string.typing_settings_taught_word_boost_subtitle,
+            setting = org.futo.inputmethod.latin.TaughtWordBoostSetting
+        ),
+        userSettingToggleDataStore(
             title = R.string.typing_settings_missed_space_split,
             subtitle = R.string.typing_settings_missed_space_split_subtitle,
             setting = org.futo.inputmethod.latin.SpaceSplitSetting

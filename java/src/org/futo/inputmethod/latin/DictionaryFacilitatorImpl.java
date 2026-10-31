@@ -372,6 +372,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         if(DictionaryFacilitatorImpl.swipeDecoderDictionary == null) {
             DictionaryFacilitatorImpl.swipeDecoderDictionary = new SwipeDecoderDictionary(context, Locale.ENGLISH);
         }
+        TaughtWords.setChecker(word -> isTaughtWord(word, TaughtWords.MIN_KEPT));
 
         final HashMap<Locale, ArrayList<String>> existingDictionariesToCleanup = new HashMap<>();
         // TODO: Make subDictTypesToUse configurable by resource or a static final list.
@@ -953,6 +954,23 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         }
 
         return isValidWord(word, ALL_DICTIONARY_TYPES);
+    }
+
+    @Override
+    public boolean isTaughtWord(final String word, final int minKept) {
+        if (TextUtils.isEmpty(word)) return false;
+        for (final DictionaryGroup dictionaryGroup : mDictionaryGroups) {
+            if (dictionaryGroup.mLocale == null) continue;
+            final Dictionary main = dictionaryGroup.getDict(Dictionary.TYPE_MAIN);
+            if (main != null && (main.isValidWord(word)
+                    || main.isValidWord(word.toLowerCase(dictionaryGroup.mLocale)))) return false;
+        }
+        for (final DictionaryGroup dictionaryGroup : mDictionaryGroups) {
+            final ExpandableBinaryDictionary userHistory =
+                    dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY);
+            if (userHistory != null && userHistory.getHistoricalCount(word) >= minKept) return true;
+        }
+        return false;
     }
 
     public boolean isValidSuggestionWord(final String word) {

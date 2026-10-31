@@ -35,6 +35,7 @@ import org.futo.inputmethod.event.InputTransaction;
 import org.futo.inputmethod.keyboard.Keyboard;
 import org.futo.inputmethod.keyboard.KeyboardSwitcher;
 import org.futo.inputmethod.latin.LearnKeptWords;
+import org.futo.inputmethod.latin.TaughtWords;
 import org.futo.inputmethod.latin.BinaryDictionary;
 import org.futo.inputmethod.latin.DictionaryFacilitator;
 import org.futo.inputmethod.latin.LastComposedWord;
@@ -860,7 +861,9 @@ public final class InputLogic {
         }
         if (!suggestedWords.isEmpty()) {
             suggestedWords.mWillAutoCorrect = suggestedWords.mWillAutoCorrect
-                    && !mConnection.textBeforeCursorLooksLikeURL();
+                    && !mConnection.textBeforeCursorLooksLikeURL()
+                    && !(TaughtWords.isEnabled(mImeHelper.getContext())
+                            && TaughtWords.keepTyped(mWordComposer.getTypedWord()));
             final SuggestedWordInfo suggestedWordInfo;
             if (suggestedWords.mWillAutoCorrect) {
                 suggestedWordInfo = suggestedWords.getInfo(SuggestedWords.INDEX_OF_AUTO_CORRECTION);

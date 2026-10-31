@@ -392,6 +392,28 @@ public class LanguageModelFacilitator(
             suggestionResults.add(clone)
         }
 
+        if(!suggestionResults.mForceAutoCorrection && context.getSetting(org.futo.inputmethod.latin.TaughtWordBoostSetting)) {
+            // TaughtWords: a close taught word beats the dictionary's top word
+            val candidates = suggestedWordsDictList.filter {
+                it != suggestedWordsDict.typedWordInfo && !it.isKindOf(SuggestedWordInfo.KIND_EMOJI_SUGGESTION)
+            }
+            val top = candidates.indices.maxByOrNull { candidates[it].mScore } ?: -1
+            val typed = values.composedData.mTypedWord
+            val pick = org.futo.inputmethod.latin.TaughtWords.promoteTap(
+                typed, dictionaryFacilitator.isValidSpellingWord(typed) && !org.futo.inputmethod.latin.TaughtWords.isTaught(typed),
+                candidates.map { it.mWord }, IntArray(candidates.size) { candidates[it].mScore },
+                BooleanArray(candidates.size) { candidates[it].mSourceDict?.mDictType == Dictionary.TYPE_USER_HISTORY }, top
+            )
+            if(pick >= 0) {
+                val topScore = suggestionResults.firstOrNull()?.mScore ?: 0
+                suggestionResults.add(SuggestedWordInfo(
+                    candidates[pick].mWord, "", maxOf(topScore, candidates[top].mScore) + 1, SuggestedWordInfo.KIND_CORRECTION,
+                    candidates[pick].mSourceDict, SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE
+                ))
+                suggestionResults.mForceAutoCorrection = true
+            }
+        }
+
         suggestionResults.mRawSuggestions?.addAll(reweightedSuggestions.filter { !filtered.contains(it) })
         if(transformerWeight != Float.POSITIVE_INFINITY) {
             suggestedWordsDictList?.let { words ->

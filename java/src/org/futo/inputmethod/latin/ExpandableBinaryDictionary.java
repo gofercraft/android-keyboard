@@ -525,6 +525,30 @@ abstract public class ExpandableBinaryDictionary extends Dictionary {
         return false;
     }
 
+    /** How many times [word] was added (user history's count), 0 if it is not in this dictionary. */
+    public int getHistoricalCount(final String word) {
+        reloadDictionaryIfRequired();
+        boolean lockAcquired = false;
+        try {
+            lockAcquired = mLock.readLock().tryLock(
+                    TIMEOUT_FOR_READ_OPS_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+            if (lockAcquired) {
+                if (mBinaryDictionary == null || !mBinaryDictionary.isInDictionary(word)) return 0;
+                final org.futo.inputmethod.latin.makedict.WordProperty property =
+                        mBinaryDictionary.getWordProperty(word, false);
+                if (property == null || property.mProbabilityInfo == null) return 0;
+                return Math.max(0, property.mProbabilityInfo.mCount);
+            }
+        } catch (final InterruptedException e) {
+            Log.e(TAG, "Interrupted tryLock() in getHistoricalCount().", e);
+        } finally {
+            if (lockAcquired) {
+                mLock.readLock().unlock();
+            }
+        }
+        return 0;
+    }
+
     protected boolean isInDictionaryLocked(final String word) {
         if (mBinaryDictionary == null) return false;
         return mBinaryDictionary.isInDictionary(word);
