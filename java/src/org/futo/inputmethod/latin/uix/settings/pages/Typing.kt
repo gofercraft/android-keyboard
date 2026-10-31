@@ -913,6 +913,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             setting = org.futo.inputmethod.latin.TaughtWordBoostSetting
         ),
         userSettingToggleDataStore(
+            title = R.string.typing_settings_apostrophe_pairs,
+            subtitle = R.string.typing_settings_apostrophe_pairs_subtitle,
+            setting = org.futo.inputmethod.latin.ApostrophePairsSetting
+        ),
+        userSettingToggleDataStore(
             title = R.string.typing_settings_missed_space_split,
             subtitle = R.string.typing_settings_missed_space_split_subtitle,
             setting = org.futo.inputmethod.latin.SpaceSplitSetting

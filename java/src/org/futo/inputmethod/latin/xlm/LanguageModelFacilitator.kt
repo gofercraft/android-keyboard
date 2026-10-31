@@ -924,6 +924,40 @@ public class LanguageModelFacilitator(
         return org.futo.inputmethod.latin.PreviousWordDecision(word, auto)
     }
 
+    /**
+     * ApostrophePairs: the other form of a pair word ("well" / "we'll") if the LM
+     * prefers it clearly, else null. Each form scores ln p(form | before), plus
+     * ln p(next | before form) once the next word is known.
+     */
+    suspend fun apostropheDecision(
+        check: org.futo.inputmethod.latin.ApostrophePairs.Check
+    ): String? {
+        val a = org.futo.inputmethod.latin.ApostrophePairs
+        val request = check.request
+        val model = languageModel ?: return null
+        if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
+        val committed = request.original
+        val other = a.otherForm(committed) ?: return null
+        // Score the forms as the dictionary spells them, without a sentence-start capital
+        val forms = listOf(committed.lowercase().replace("'", "").let { bare ->
+            if(committed.contains('\'')) a.PAIRS[bare] ?: return null else bare
+        }, other)
+        val first = model.firstTokenProbabilitiesForContext(forms, request.context) ?: return null
+        val scores = DoubleArray(2) { ln(maxOf(first[it], 1e-9f).toDouble()) }
+        if(check.withNext) {
+            if(request.next.isEmpty()) return null
+            for(i in 0..1) {
+                val p = model.firstTokenProbabilitiesForContext(
+                    listOf(request.next), request.context + " " + forms[i]
+                )?.get(0) ?: return null
+                scores[i] += ln(maxOf(p, 1e-9f).toDouble())
+            }
+        }
+        val lead = scores[1] - scores[0]
+        if(lead < (if(check.withNext) a.NEXT_MIN_LEAD else a.AUTO_MIN_LEAD)) return null
+        return a.cased(other, request.context)
+    }
+
     public fun onStartInput() {
         transformerDisabled = false
         numConsecutiveTimeouts = 0

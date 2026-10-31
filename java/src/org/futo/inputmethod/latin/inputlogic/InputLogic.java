@@ -43,6 +43,7 @@ import org.futo.inputmethod.latin.PreviousSwipeRevision;
 import org.futo.inputmethod.latin.PreviousWordOffer;
 import org.futo.inputmethod.latin.StraySpaceMerge;
 import org.futo.inputmethod.latin.SpaceSplit;
+import org.futo.inputmethod.latin.ApostrophePairs;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -2870,6 +2871,8 @@ public final class InputLogic {
                 && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
             submitSpaceSplit(chosenWord, settingsValues.mAutoCorrectionEnabledPerUserSettings);
         }
+        submitApostropheChecks(mergedWord == null ? chosenWord : null, commitType,
+                settingsValues.mAutoCorrectionEnabledPerUserSettings);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
@@ -2936,7 +2939,38 @@ public final class InputLogic {
                 "", "", mConnection.getExpectedSelectionEnd()), committedIsWord, rival, autoAllowed));
     }
 
+    /**
+     * ApostrophePairs: check the pair word before this one now that [word] follows
+     * it, and check [word] itself if it is a pair word ("well" / "we'll") the keyboard chose.
+     */
+    private void submitApostropheChecks(final String word, final int commitType,
+            final boolean autoAllowed) {
+        final PreviousSwipeRevision.Swiped previous = ApostrophePairs.getWaiting();
+        ApostrophePairs.setWaiting(null);
+        if (!autoAllowed || word == null || word.isEmpty()
+                || !ApostrophePairs.isEnabled(mImeHelper.getContext())) return;
+        final CharSequence before = mConnection.getTextBeforeCursor(
+                PreviousSwipeRevision.CONTEXT_CHARS, 0);
+        if (before == null) return;
+        final String text = before.toString();
+        final int cursor = mConnection.getExpectedSelectionEnd();
+        if (previous != null) {
+            final PreviousSwipeRevision.Request request = previous.requestFor(word, text, cursor);
+            if (request != null) ApostrophePairs.submit(new ApostrophePairs.Check(request, true));
+        }
+        final String other = ApostrophePairs.otherForm(word);
+        if (other == null || commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                || !text.endsWith(word)) return;
+        final String textBefore = text.substring(0, text.length() - word.length());
+        final java.util.List<String> forms = java.util.Arrays.asList(word, other);
+        ApostrophePairs.setWaiting(new PreviousSwipeRevision.Swiped(false, word, forms,
+                java.util.Collections.emptyList(), textBefore, cursor));
+        ApostrophePairs.submit(new ApostrophePairs.Check(new PreviousSwipeRevision.Request(false, word,
+                forms, java.util.Collections.emptyList(), textBefore, "", "", cursor), false));
+    }
+
     private void clearPreviousWordOffer() {
+        ApostrophePairs.cancelPending();
         SpaceSplit.cancelPending();
         PreviousSwipeRevision.cancelPending();
         mOfferRequest = null;

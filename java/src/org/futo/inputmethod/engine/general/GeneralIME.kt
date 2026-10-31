@@ -251,6 +251,18 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
                 }
             }
         }
+        org.futo.inputmethod.latin.ApostrophePairs.engine = { check ->
+            val a = org.futo.inputmethod.latin.ApostrophePairs
+            val job = helper.lifecycleScope.launch(Dispatchers.Default) {
+                val word = languageModelFacilitator.apostropheDecision(check) ?: return@launch
+                withContext(Dispatchers.Main) {
+                    // Replaced at commit: the word no longer waits for the next word
+                    if(!check.withNext && a.waiting?.cursor == check.request.cursor) a.waiting = null
+                    inputLogic.applySwipeRevision(check.request, word)
+                }
+            }
+            if(check.withNext) a.pendingNext = job else a.pendingNow = job
+        }
         if (context.isDirectBootUnlocked) onDeviceUnlocked()
 
         suggestionBlacklist.init()
