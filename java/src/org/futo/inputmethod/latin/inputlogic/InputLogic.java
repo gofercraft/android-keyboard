@@ -37,6 +37,7 @@ import org.futo.inputmethod.keyboard.KeyboardSwitcher;
 import org.futo.inputmethod.latin.BinaryDictionary;
 import org.futo.inputmethod.latin.DictionaryFacilitator;
 import org.futo.inputmethod.latin.LastComposedWord;
+import org.futo.inputmethod.latin.PreviousSwipeRevision;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -111,6 +112,10 @@ public final class InputLogic {
     private final DictionaryFacilitator mDictionaryFacilitator;
 
     public LastComposedWord mLastComposedWord = LastComposedWord.NOT_A_COMPOSED_WORD;
+    // PreviousSwipeRevision: the last swiped word waiting for the next word, and
+    // the last revision applied, which the next backspace undoes
+    private PreviousSwipeRevision.Swiped mLastSwiped = null;
+    private PreviousSwipeRevision.Revision mLastSwipeRevision = null;
     
     public final WordComposer mWordComposer;
     public final RichInputConnection mConnection;
@@ -662,6 +667,7 @@ public final class InputLogic {
             unlearnWord(mWordComposer.getTypedWord(), settingsValues, Constants.EVENT_BACKSPACE);
             resetComposingWord(settingsValues, false);
         }
+        if (event.mKeyCode != Constants.CODE_DELETE) mLastSwipeRevision = null;
         final Event processedEvent = mWordComposer.processEvent(event);
         final InputTransaction inputTransaction = new InputTransaction(settingsValues,
                 processedEvent, SystemClock.uptimeMillis(), mSpaceState,
@@ -751,6 +757,7 @@ public final class InputLogic {
     public void onStartBatchInput(final SettingsValues settingsValues,
             final KeyboardSwitcher keyboardSwitcher) {
         mWordBeingCorrectedByCursor = null;
+        mLastSwipeRevision = null;
         mInputLogicHandler.onStartBatchInput();
 
         mIme.setNeutralSuggestionStrip();
@@ -1475,6 +1482,9 @@ public final class InputLogic {
             }
             inputTransaction.setRequiresUpdateSuggestions();
         } else {
+            if (mLastSwipeRevision != null && undoSwipeRevision()) {
+                return;
+            }
             if (mLastComposedWord.canRevertCommit()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
@@ -2796,6 +2806,7 @@ public final class InputLogic {
             Log.d(TAG, "commitChosenWord() : NgramContext = " + ngramContext);
             startTimeMillis = System.currentTimeMillis();
         }
+        final boolean committingSwipe = mWordComposer.isBatchMode();
         mConnection.commitText(chosenWordWithSuggestions, 1);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -2818,12 +2829,85 @@ public final class InputLogic {
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType,
                 chosenWordWithSuggestions, separatorString, ngramContext);
+        onCommitForSwipeRevision(chosenWord, commitType, committingSwipe);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
                     + "WordComposer.commitWord()");
             startTimeMillis = System.currentTimeMillis();
         }
+    }
+
+    /**
+     * PreviousSwipeRevision: after any commit, ask for a revision of the swiped word
+     * before it, and remember this word if the keyboard chose it from a swipe.
+     */
+    private void onCommitForSwipeRevision(final String word, final int commitType,
+            final boolean swiped) {
+        final PreviousSwipeRevision.Swiped previous = mLastSwiped;
+        mLastSwiped = null;
+        if (!PreviousSwipeRevision.isEnabled(mImeHelper.getContext())) return;
+        final CharSequence before = mConnection.getTextBeforeCursor(
+                PreviousSwipeRevision.CONTEXT_CHARS, 0);
+        if (before == null) return;
+        final String text = before.toString();
+        final int cursor = mConnection.getExpectedSelectionEnd();
+        if (previous != null) {
+            final PreviousSwipeRevision.Request request = previous.requestFor(word, text, cursor);
+            if (request != null) PreviousSwipeRevision.submit(request);
+        }
+        if (swiped && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
+            mLastSwiped = PreviousSwipeRevision.swiped(word, text, cursor);
+        }
+    }
+
+    /**
+     * Replaces the previous swiped word with its revision if nothing changed since the request:
+     * the cursor is where it was (or one separator further) and the text still reads
+     * "original, space, next word". Called on the main thread.
+     */
+    public void applySwipeRevision(final PreviousSwipeRevision.Request request,
+            final String revised) {
+        if (mWordComposer.isComposingWord() || mConnection.hasSelection()) return;
+        final String expected = request.getOriginal() + request.getTail();
+        final int cursor = mConnection.getExpectedSelectionEnd();
+        final String extra;
+        if (cursor == request.getCursor()) {
+            extra = "";
+        } else if (cursor == request.getCursor() + 1) {
+            final CharSequence last = mConnection.getTextBeforeCursor(1, 0);
+            if (last == null || last.length() != 1 || Character.isLetterOrDigit(last.charAt(0))) return;
+            extra = last.toString();
+        } else {
+            return;
+        }
+        final CharSequence before = mConnection.getTextBeforeCursor(expected.length() + extra.length(), 0);
+        if (before == null || !before.toString().equals(expected + extra)) return;
+        mConnection.beginBatchEdit();
+        mConnection.deleteTextBeforeCursor(expected.length() + extra.length());
+        mConnection.commitText(revised + request.getTail() + extra, 1);
+        mConnection.endBatchEdit();
+        mConnection.commitCorrection(new CorrectionInfo(
+                cursor - expected.length() - extra.length(), request.getOriginal(), revised));
+        mLastSwipeRevision = new PreviousSwipeRevision.Revision(request.getOriginal(), revised,
+                request.getTail() + extra, mConnection.getExpectedSelectionEnd());
+        mLastSwiped = null;
+    }
+
+    /** Backspace right after a revision restores the original swiped word. */
+    private boolean undoSwipeRevision() {
+        final PreviousSwipeRevision.Revision revision = mLastSwipeRevision;
+        mLastSwipeRevision = null;
+        if (mConnection.hasSelection()
+                || mConnection.getExpectedSelectionEnd() != revision.getCursor()) return false;
+        final String now = revision.getRevised() + revision.getAfter();
+        final CharSequence before = mConnection.getTextBeforeCursor(now.length(), 0);
+        if (before == null || !before.toString().equals(now)) return false;
+        mConnection.beginBatchEdit();
+        mConnection.deleteTextBeforeCursor(now.length());
+        mConnection.commitText(revision.getOriginal() + revision.getAfter(), 1);
+        mConnection.endBatchEdit();
+        return true;
     }
 
     /**

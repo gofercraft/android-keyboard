@@ -180,6 +180,40 @@ class LanguageModel(
         return context
     }
 
+    /**
+     * swipe re-score: for each word, p(first token | previous words) divided by
+     * its token count, as rescoreSuggestionsNative computes it. Two dummy entries pin the input
+     * score range so the probability can be read back from the output score. Null if the model
+     * is not loaded; this never loads it.
+     */
+    suspend fun firstTokenProbabilities(words: List<String>, ngramContext: NgramContext): FloatArray? = withContext(LanguageModelScope) {
+        if (mNativeState == 0L || words.isEmpty()) return@withContext null
+        val context = safeguardContext(getContext(ComposeInfo("", IntArray(0), IntArray(0), 0), ngramContext))
+        val top = 1_000_000
+        val inWords = arrayOf("x", "x") + words.toTypedArray()
+        val inScores = IntArray(inWords.size) { if (it == 0) 0 else top }
+        val outScores = IntArray(inWords.size)
+        rescoreSuggestionsNative(mNativeState, context, inWords, inScores, outScores)
+        // The native maps the input range [0, top] to [lo, top] with lo = -0.33 * top
+        val lo = -0.33 * top
+        val range = top - lo
+        FloatArray(words.size) { ((outScores[it + 2] - lo) / (1000.0 * range)).toFloat() }
+    }
+
+    /** As firstTokenProbabilities, for an explicit context text (PreviousSwipeRevision). */
+    suspend fun firstTokenProbabilitiesForContext(words: List<String>, contextText: String): FloatArray? = withContext(LanguageModelScope) {
+        if (mNativeState == 0L || words.isEmpty()) return@withContext null
+        val context = safeguardContext(contextText.trim())
+        val top = 1_000_000
+        val inWords = arrayOf("x", "x") + words.toTypedArray()
+        val inScores = IntArray(inWords.size) { if (it == 0) 0 else top }
+        val outScores = IntArray(inWords.size)
+        rescoreSuggestionsNative(mNativeState, context, inWords, inScores, outScores)
+        val lo = -0.33 * top
+        val range = top - lo
+        FloatArray(words.size) { ((outScores[it + 2] - lo) / (1000.0 * range)).toFloat() }
+    }
+
     suspend fun rescoreSuggestions(
         suggestedWords: SuggestedWords,
         composedData: ComposedData,

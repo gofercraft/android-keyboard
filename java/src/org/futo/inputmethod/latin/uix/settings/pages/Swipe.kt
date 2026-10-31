@@ -239,6 +239,18 @@ val SwipeMenu = UserSettingsMenu(
             setting = org.futo.inputmethod.latin.SwipeShapeRerankSetting,
         ),
 
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_transformer_rescore,
+            subtitle = R.string.swipe_settings_transformer_rescore_subtitle,
+            setting = org.futo.inputmethod.latin.xlm.TransformerSwipeRescoreSetting,
+        ),
+
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_previous_swipe_revision,
+            subtitle = R.string.swipe_settings_previous_swipe_revision_subtitle,
+            setting = org.futo.inputmethod.latin.PreviousSwipeRevisionSetting,
+        ),
+
         userSettingToggleSharedPrefs(
             title = R.string.swipe_settings_sensitive_swipe,
             subtitle = R.string.swipe_settings_sensitive_swipe_subtitle,

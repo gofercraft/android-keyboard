@@ -385,6 +385,8 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         }
         val order = SwipeShapeReranker.rerank(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
         val sortedScores = scores.sortedDescending()
+        val shapeScores = SwipeShapeReranker.scores(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
+        LastSwipeShapeScores.set(order.take(4).map { words[it] }, order.take(4).map { shapeScores[it] })
         return order.take(4).mapIndexed { rank, i -> words[i] to sortedScores[rank] }
     }
 
@@ -507,6 +509,9 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         val shapeRerank = useHighBeam && !isMultiSwipe && context.getSetting(SwipeShapeRerankSetting)
                 && shapeRerankApplies(appliedLayoutInfo, locale)
         if(shapeRerank) SwipeShapeReranker.setStrict(context.getSetting(SwipeShapeStrictSetting))
+        // Without the re-rank there are no shape scores for this gesture; drop any left from an earlier one
+        // so 10 and 11 never act on another swipe's words.
+        if(useHighBeam && !shapeRerank) LastSwipeShapeScores.set(emptyList(), emptyList())
         val topK = if(useHighBeam) (if(shapeRerank) SHAPE_RERANK_TOP_K else 4) else 1
 
         val results = synchronized(BinaryDictionary.sTrieUsageLock) {
@@ -675,3 +680,16 @@ val SwipeShapeStrictSetting = SettingsKey(booleanPreferencesKey("swipe_shape_str
 
 /** How many decoder candidates the shape re-ranker looks at (the decoder's beam stays 300). */
 const val SHAPE_RERANK_TOP_K = 16
+
+/**
+ * the SwipeShapeReranker scores of the words the last swipe handed out, for the optional
+ * transformer re-score (TransformerSwipeRescoreSetting). Only the latest gesture is kept.
+ */
+object LastSwipeShapeScores {
+    @Volatile private var last: Pair<List<String>, List<Double>>? = null
+    @Volatile private var lastForRevision: Pair<List<String>, List<Double>>? = null
+    fun set(words: List<String>, scores: List<Double>) { last = words to scores; lastForRevision = words to scores }
+    fun take(): Pair<List<String>, List<Double>>? = last.also { last = null }
+    /** The same words and scores for PreviousSwipeRevision; cleared once read. */
+    fun forRevision(): Pair<List<String>, List<Double>>? = lastForRevision.also { lastForRevision = null }
+}

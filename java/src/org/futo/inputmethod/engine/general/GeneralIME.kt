@@ -210,6 +210,12 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
 
     override fun onCreate() {
         languageModelFacilitator.launchProcessor()
+        org.futo.inputmethod.latin.PreviousSwipeRevision.engine = { request ->
+            helper.lifecycleScope.launch(languageModelFacilitator.languageModelScope) {
+                val revised = languageModelFacilitator.revisePreviousSwipe(request) ?: return@launch
+                withContext(Dispatchers.Main) { inputLogic.applySwipeRevision(request, revised) }
+            }
+        }
         if (context.isDirectBootUnlocked) onDeviceUnlocked()
 
         suggestionBlacklist.init()
@@ -227,6 +233,7 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
     }
 
     override fun onDestroy() {
+        org.futo.inputmethod.latin.PreviousSwipeRevision.engine = null
         dictionaryFacilitator.closeDictionaries()
         languageModelFacilitator.saveHistoryLog()
 
@@ -519,7 +526,11 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
             }
 
             dictResult != null -> {
-                onGetSuggestedWords(dictResult, inputStyle, sequenceNumber)
+                val words = dictResult!!
+                val rescored = if(inputStyle == SuggestedWords.INPUT_STYLE_TAIL_BATCH) {
+                    languageModelFacilitator.swipeTransformerRescored(words)
+                } else null
+                onGetSuggestedWords(rescored ?: words, inputStyle, sequenceNumber)
             }
 
             // Note: we don't support LM results but not dict

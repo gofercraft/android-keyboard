@@ -548,6 +548,10 @@
     <string name="swipe_settings_enable_swipe_typing">Enable swipe typing</string>
     <string name="swipe_settings_enable_swipe_typing_subtitle">Allow swiping from key to key to write words.</string>
     <string name="swipe_settings_shape_rerank">Use swipe shape to pick the word</string>
+    <string name="swipe_settings_transformer_rescore">Use the language model to pick the swiped word</string>
+    <string name="swipe_settings_transformer_rescore_subtitle">Weigh how well each swipe suggestion fits the previous words (slightly slower)</string>
+    <string name="swipe_settings_previous_swipe_revision">Fix the previous swiped word</string>
+    <string name="swipe_settings_previous_swipe_revision_subtitle">After the next word, change a swiped word that fits better, such as to much to too much. Backspace undoes it</string>
     <string name="swipe_settings_shape_rerank_subtitle">Re-rank swipe suggestions by how well each word fits the gesture\'s shape</string>
 
     <string name="swipe_settings_sensitive_swipe">Increase sensitivity</string>

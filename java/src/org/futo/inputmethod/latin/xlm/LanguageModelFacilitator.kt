@@ -12,6 +12,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import org.futo.inputmethod.engine.general.OnGetSuggestedWordsCallbackWithInputStyle
 import org.futo.inputmethod.keyboard.Keyboard
 import org.futo.inputmethod.keyboard.KeyboardSwitcher
@@ -33,6 +34,7 @@ import org.futo.inputmethod.latin.uix.USE_TRANSFORMER_FINETUNING
 import org.futo.inputmethod.latin.uix.getSetting
 import org.futo.inputmethod.latin.utils.SuggestionResults
 import kotlin.math.ceil
+import kotlin.math.ln
 
 
 val AutocorrectThresholdSetting = SettingsKey(
@@ -61,6 +63,27 @@ val AllowTransformerOnNonQWERTYLayouts = SettingsKey(
     booleanPreferencesKey("allow_transformer_lm_on_non_qwerty"),
     false
 )
+
+// after the swipe shape re-rank (SwipeShapeReranker), add 0.2 x ln p(first token | previous
+// words) from the transformer LM and re-pick the swipe word. Offline with FUTO's own
+// rescoreSuggestionsNative: swipe-5 92.67% -> 92.95%, swipe-2 93.07% -> 93.44%. The model runs only when
+// 08's top two are within 2.0 (about 12% of swipes): mean 3.6 ms, p95 16 ms per swipe on a desktop core. Off by default until it is timed on a phone.
+val TransformerSwipeRescoreSetting = SettingsKey(
+    booleanPreferencesKey("transformer_swipe_rescore"),
+    false
+)
+
+/** Weight of ln p(first token) against the SwipeShapeReranker score, fitted on FIT. */
+const val TRANSFORMER_SWIPE_WEIGHT = 0.2
+
+const val TRANSFORMER_SWIPE_TIMEOUT_MS = 150L
+
+/**
+ * Skip the re-score when 08's best word leads its runner-up by this much (fitted on FIT). The model
+ * then runs on about 12% of swipes and keeps the whole gain. A lead above 4.1 can never flip, because
+ * 0.2 x ln(1e-9) = -4.1.
+ */
+const val TRANSFORMER_SWIPE_SKIP_MARGIN = 2.0
 
 internal fun SuggestedWordInfo.add(other: SuggestedWordInfo): SuggestedWordInfo {
     assert(mWord == other.mWord)
@@ -732,6 +755,80 @@ public class LanguageModelFacilitator(
     public fun loadHistoryLog() {
         assert(historyLog.isEmpty())
         loadHistoryLogBackup(context, historyLog)
+    }
+
+    /**
+     * re-picks the swipe word as SwipeShapeReranker score + TRANSFORMER_SWIPE_WEIGHT *
+     * ln p(first token | previous words). Returns null to keep the decoder's list.
+     */
+    suspend fun swipeTransformerRescored(words: SuggestedWords): SuggestedWords? {
+        if(!context.getSetting(TransformerSwipeRescoreSetting)) return null
+        val (stashWords, stashScores) = org.futo.inputmethod.latin.LastSwipeShapeScores.take() ?: return null
+        val list = words.mSuggestedWordInfoList
+        if(list.size < 2 || stashScores.size < 2) return null
+        // A clear SwipeShapeReranker winner is never overturned in practice: skip the model call
+        if(stashScores[0] - stashScores[1] >= TRANSFORMER_SWIPE_SKIP_MARGIN) return null
+        // Only when the strip is exactly what SwipeShapeReranker handed out (not 02's one-letter word, etc.)
+        val shape = HashMap<String, Double>()
+        stashWords.forEachIndexed { i, w -> shape.putIfAbsent(w.lowercase(), stashScores[i]) }
+        if(list[0].mWord.lowercase() != stashWords[0].lowercase()) return null
+        if(list.any { !shape.containsKey(it.mWord.lowercase()) }) return null
+
+        val model = languageModel ?: return null
+        if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
+        val ngramContext = inputLogic.getNgramContextFromNthPreviousWordForSuggestion(
+            settings.current.mSpacingAndPunctuations, 2
+        )
+        val probs = withTimeoutOrNull(TRANSFORMER_SWIPE_TIMEOUT_MS) {
+            model.firstTokenProbabilities(list.map { it.mWord }, ngramContext)
+        } ?: return null
+
+        val scored = list.indices.map { i ->
+            shape[list[i].mWord.lowercase()]!! + TRANSFORMER_SWIPE_WEIGHT * ln(maxOf(probs[i], 1e-9f).toDouble())
+        }
+        val best = scored.indices.maxByOrNull { scored[it] } ?: return null
+        if(best == 0) return null
+        // Same word with another case, apostrophe or hyphen: keep the decoder's spelling
+        val bare = { w: String -> w.lowercase().replace("'", "").replace("-", "") }
+        if(bare(list[best].mWord) == bare(list[0].mWord)) return null
+
+        val reordered = ArrayList(list)
+        reordered.add(0, reordered.removeAt(best))
+        return SuggestedWords(
+            reordered, words.mRawSuggestions, reordered[0], words.mTypedWordValid,
+            words.mWillAutoCorrect, words.mIsObsoleteSuggestions, words.mInputStyle, words.mSequenceNumber
+        )
+    }
+
+    /**
+     * the revised spelling of the previous swiped word, or null to keep it. Scores
+     * SwipeShapeReranker's top 4 by shape score + WORD_WEIGHT ln p(word | before) + NEXT_WEIGHT ln p(next | before + word).
+     */
+    suspend fun revisePreviousSwipe(request: org.futo.inputmethod.latin.PreviousSwipeRevision.Request): String? {
+        val r = org.futo.inputmethod.latin.PreviousSwipeRevision
+        val model = languageModel ?: return null
+        if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
+        val words = request.candidates
+        val shape = request.shapeScores
+        if(words.size < 2 || shape[0] - shape[1] >= r.MAX_SHAPE_MARGIN) return null
+        val pWord = model.firstTokenProbabilitiesForContext(words, request.context) ?: return null
+        val scores = words.indices.map { i ->
+            val pNext = model.firstTokenProbabilitiesForContext(
+                listOf(request.next), request.context + " " + words[i]
+            )?.get(0) ?: return null
+            shape[i] + r.WORD_WEIGHT * ln(maxOf(pWord[i], 1e-9f).toDouble()) +
+                    r.NEXT_WEIGHT * ln(maxOf(pNext, 1e-9f).toDouble())
+        }
+        val bestIndex = scores.indices.maxByOrNull { scores[it] } ?: return null
+        val best = words[bestIndex]
+        if(r.sameBareWord(best, request.original)) return null
+        // Precision guards: short words only, and a clear win over the word on screen
+        val current = words.indexOfFirst { it.equals(request.original, ignoreCase = true) }
+        if(current < 0 || scores[bestIndex] - scores[current] < r.MIN_SCORE_LEAD) return null
+        if(maxOf(best.length, request.original.length) > r.MAX_WORD_LENGTH) return null
+        // Keep a capital the keyboard gave the original (sentence start)
+        return if(request.original.first().isUpperCase() && best.first().isLowerCase())
+            best.replaceFirstChar { it.titlecase() } else best
     }
 
     public fun onStartInput() {

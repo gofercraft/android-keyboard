@@ -113,6 +113,20 @@ public final class SwipeShapeReranker {
         return out;
     }
 
+    /** The re-ranker's score for each word (higher is better), in the input order. */
+    public static double[] scores(final float[] xs, final float[] ys, final float[] ts,
+                                  final Map<Character, float[]> keys,
+                                  final String[] words, final float[] scores) {
+        final double[] s = new double[words.length];
+        if (xs.length == 0 || keys.isEmpty()) {
+            for (int i = 0; i < s.length; i++) s[i] = DECODER_SCALE * scores[i];
+            return s;
+        }
+        final Gesture g = new Gesture(xs, ys, ts, keys);
+        for (int i = 0; i < s.length; i++) s[i] = score(g, words[i], scores[i]);
+        return s;
+    }
+
     static double score(final Gesture g, final String word, final float decoderScore) {
         final double[] f = g.features(word);
         double s = DECODER_SCALE * decoderScore;
