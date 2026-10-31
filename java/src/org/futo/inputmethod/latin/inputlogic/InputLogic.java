@@ -34,6 +34,7 @@ import org.futo.inputmethod.event.Event;
 import org.futo.inputmethod.event.InputTransaction;
 import org.futo.inputmethod.keyboard.Keyboard;
 import org.futo.inputmethod.keyboard.KeyboardSwitcher;
+import org.futo.inputmethod.latin.LearnKeptWords;
 import org.futo.inputmethod.latin.BinaryDictionary;
 import org.futo.inputmethod.latin.DictionaryFacilitator;
 import org.futo.inputmethod.latin.LastComposedWord;
@@ -2304,7 +2305,16 @@ public final class InputLogic {
         }
 
         if (inputTransaction.mSettingsValues.mSpacingAndPunctuations.currentLanguageHasSpaces) {
+            final NgramContext ngramContextForRevert = mConnection.getNgramContextFromNthPreviousWord(
+                    settingsValues.mSpacingAndPunctuations, 1);
             mConnection.commitText(textToCommit, 1);
+            // The user undid an autocorrection to keep what they typed: learn that word, with
+            // the same weight as picking it from the strip (importance 3).
+            if (LearnKeptWords.isEnabled() && !TextUtils.isEmpty(originallyTypedWordString)
+                    && !originallyTypedWordString.equals(committedWordString)) {
+                performAdditionToUserHistoryDictionary(settingsValues, originallyTypedWordString,
+                        ngramContextForRevert, 3);
+            }
             if (usePhantomSpace) {
                 if(settingsValues.mAltSpacesMode != Settings.SPACES_MODE_NONE) mSpaceState = SpaceState.PHANTOM;
             }

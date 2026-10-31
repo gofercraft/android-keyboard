@@ -459,6 +459,8 @@
     <string name="typing_settings_suggest_emojis">Emoji Suggestions</string>
     <string name="typing_settings_suggest_emojis_subtitle">Suggest emojis while you\'re typing</string>
     <string name="typing_settings_supplement_dictionary">Everyday extra words</string>
+    <string name="typing_settings_learn_kept_words">Learn kept words at once</string>
+    <string name="typing_settings_learn_kept_words_subtitle">Remember a new word the first time you keep it (pick it from the suggestions or undo a correction)</string>
     <string name="typing_settings_supplement_dictionary_subtitle">Suggest common chat words and abbreviations missing from the main dictionary (idk, TV, lol)</string>
     <string name="typing_settings_vibration_strength">Vibration</string>
     <string name="typing_settings_vibration_strength_default">Default</string>

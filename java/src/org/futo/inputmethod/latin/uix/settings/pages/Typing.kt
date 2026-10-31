@@ -133,6 +133,7 @@ import org.futo.inputmethod.latin.uix.settings.userSettingToggleSharedPrefs
 import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.v2keyboard.KeyboardSettings
 import org.futo.inputmethod.latin.SupplementDictionarySetting
+import org.futo.inputmethod.latin.LearnKeptWordsSetting
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -877,6 +878,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             title = R.string.typing_settings_supplement_dictionary,
             subtitle = R.string.typing_settings_supplement_dictionary_subtitle,
             setting = SupplementDictionarySetting
+        ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_learn_kept_words,
+            subtitle = R.string.typing_settings_learn_kept_words_subtitle,
+            setting = LearnKeptWordsSetting
         ),
         userSettingToggleSharedPrefs(
             title = R.string.auto_cap,

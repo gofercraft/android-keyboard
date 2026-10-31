@@ -30,6 +30,7 @@ import org.futo.inputmethod.latin.BuildConfig
 import org.futo.inputmethod.latin.Dictionary
 import org.futo.inputmethod.latin.DictionaryFacilitator
 import org.futo.inputmethod.latin.DictionaryFacilitatorProvider
+import org.futo.inputmethod.latin.LearnKeptWords
 import org.futo.inputmethod.latin.NgramContext
 import org.futo.inputmethod.latin.RichInputMethodManager
 import org.futo.inputmethod.latin.Subtypes.switchToNextLanguage
@@ -144,7 +145,8 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
         dictionaryFacilitator.addToUserHistory(
             word, wasCapitalized,
             ngramContext, timestamp,
-            blockOffensive
+            blockOffensive,
+            importance >= 3 && LearnKeptWords.isEnabled()
         )
 
         if (settings.current.mTransformerPredictionEnabled) {

@@ -684,7 +684,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
 
     public void addToUserHistory(final String suggestion, final boolean wasAutoCapitalized,
             @Nonnull final NgramContext ngramContext, final long timeStampInSeconds,
-            final boolean blockPotentiallyOffensive) {
+            final boolean blockPotentiallyOffensive, final boolean userKeptWord) {
         // Update the spelling cache before learning. Words that are not yet added to user history
         // and appear in no other language model are not considered valid.
         putWordIntoValidSpellingWordCache("addToUserHistory", suggestion);
@@ -701,7 +701,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
             final boolean wasCurrentWordAutoCapitalized = i == 0 && wasAutoCapitalized;
             addWordToUserHistory(mostConfidentDictionary, ngramContextForCurrentWord, currentWord,
                     wasCurrentWordAutoCapitalized, (int) timeStampInSeconds,
-                    blockPotentiallyOffensive);
+                    blockPotentiallyOffensive, userKeptWord && words.length == 1);
             ngramContextForCurrentWord =
                     ngramContextForCurrentWord.getNextNgramContext(new WordInfo(currentWord));
         }
@@ -732,7 +732,8 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
 
     private void addWordToUserHistory(final DictionaryGroup dictionaryGroup,
             final NgramContext ngramContext, final String word, final boolean wasAutoCapitalized,
-            final int timeStampInSeconds, final boolean blockPotentiallyOffensive) {
+            final int timeStampInSeconds, final boolean blockPotentiallyOffensive,
+            final boolean userKeptWord) {
         final ExpandableBinaryDictionary userHistoryDictionary =
                 dictionaryGroup.getSubDict(Dictionary.TYPE_USER_HISTORY);
         if (userHistoryDictionary == null || !isForLocale(userHistoryDictionary.mLocale)) {
@@ -776,7 +777,9 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         }
         // We demote unrecognized words (frequency < 0, below) by specifying them as "invalid".
         // We don't add words with 0-frequency (assuming they would be profanity etc.).
-        final boolean isValid = maxFreq > 0;
+        // A word the user kept on purpose counts from its first commit; an unknown word that was
+        // only typed still has to be seen twice (see Ver4PatriciaTriePolicy).
+        final boolean isValid = maxFreq > 0 || userKeptWord;
         UserHistoryDictionary.addToDictionary(userHistoryDictionary, ngramContext, secondWord,
                 isValid, timeStampInSeconds);
     }

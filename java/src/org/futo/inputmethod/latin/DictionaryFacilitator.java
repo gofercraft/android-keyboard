@@ -162,7 +162,7 @@ public interface DictionaryFacilitator {
 
     void addToUserHistory(final String suggestion, final boolean wasAutoCapitalized,
                           @Nonnull final NgramContext ngramContext, final long timeStampInSeconds,
-                          final boolean blockPotentiallyOffensive);
+                          final boolean blockPotentiallyOffensive, final boolean userKeptWord);
 
     void unlearnFromUserHistory(final String word,
             @Nonnull final NgramContext ngramContext, final long timeStampInSeconds,
