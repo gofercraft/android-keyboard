@@ -458,6 +458,8 @@
     <string name="typing_settings_title">Typing preferences</string>
     <string name="typing_settings_suggest_emojis">Emoji Suggestions</string>
     <string name="typing_settings_suggest_emojis_subtitle">Suggest emojis while you\'re typing</string>
+    <string name="typing_settings_supplement_dictionary">Everyday extra words</string>
+    <string name="typing_settings_supplement_dictionary_subtitle">Suggest common chat words and abbreviations missing from the main dictionary (idk, TV, lol)</string>
     <string name="typing_settings_vibration_strength">Vibration</string>
     <string name="typing_settings_vibration_strength_default">Default</string>
     <string name="typing_settings_keypress_sound_volume">Sound Volume</string>

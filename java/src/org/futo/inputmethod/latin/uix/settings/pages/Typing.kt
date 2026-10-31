@@ -131,6 +131,7 @@ import org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore
 import org.futo.inputmethod.latin.uix.settings.userSettingToggleSharedPrefs
 import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.v2keyboard.KeyboardSettings
+import org.futo.inputmethod.latin.SupplementDictionarySetting
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -870,6 +871,11 @@ val TypingSettingsMenu = UserSettingsMenu(
                 Icon(painterResource(id = R.drawable.smile), contentDescription = null,
                     tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
+        ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_supplement_dictionary,
+            subtitle = R.string.typing_settings_supplement_dictionary_subtitle,
+            setting = SupplementDictionarySetting
         ),
         userSettingToggleSharedPrefs(
             title = R.string.auto_cap,
