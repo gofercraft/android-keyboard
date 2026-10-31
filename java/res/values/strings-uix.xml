@@ -479,6 +479,8 @@
     <string name="typing_settings_auto_space_mode_suggestions2">Immediate space after suggestions</string>
     <string name="typing_settings_auto_space_mode_legacy2">Delayed space after suggestions (legacy mode)</string>
     <string name="typing_settings_auto_space_mode_none2">Disabled (not recommended)</string>
+    <string name="typing_settings_missed_space_split">Split words joined by a missed space</string>
+    <string name="typing_settings_missed_space_split_subtitle">"inan" becomes "in an" when the language model is sure; otherwise it is offered. Backspace undoes it</string>
     <string name="typing_settings_stray_space_merge">Join words split by a stray space</string>
     <string name="typing_settings_stray_space_merge_subtitle">"atta cked" becomes "attacked" when the pieces are not both words. Backspace undoes it</string>
     <string name="typing_settings_tap_shape_rerank">Use where you tapped</string>

@@ -902,6 +902,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             }
         ),
         userSettingToggleDataStore(
+            title = R.string.typing_settings_missed_space_split,
+            subtitle = R.string.typing_settings_missed_space_split_subtitle,
+            setting = org.futo.inputmethod.latin.SpaceSplitSetting
+        ),
+        userSettingToggleDataStore(
             title = R.string.typing_settings_stray_space_merge,
             subtitle = R.string.typing_settings_stray_space_merge_subtitle,
             setting = org.futo.inputmethod.latin.StraySpaceMergeSetting

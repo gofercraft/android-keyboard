@@ -233,6 +233,22 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
                 }
             }
         }
+        org.futo.inputmethod.latin.SpaceSplit.engine = { split ->
+            val sp = org.futo.inputmethod.latin.SpaceSplit
+            val request = split.request
+            sp.cancelPending()
+            sp.pending = helper.lifecycleScope.launch(Dispatchers.Default) {
+                val decision = languageModelFacilitator.spaceSplitDecision(split) ?: return@launch
+                withContext(Dispatchers.Main) {
+                    if(decision.auto) {
+                        inputLogic.applySwipeRevision(request, decision.word)
+                    } else if(context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSetting)
+                        && inputLogic.setPreviousWordOffer(request, decision.word)) {
+                        showSuggestionStrip(inputLogic.withPreviousWordOffer(inputLogic.mSuggestedWords))
+                    }
+                }
+            }
+        }
         if (context.isDirectBootUnlocked) onDeviceUnlocked()
 
         suggestionBlacklist.init()

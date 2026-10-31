@@ -857,6 +857,51 @@ public class LanguageModelFacilitator(
         return org.futo.inputmethod.latin.PreviousWordDecision(best, auto)
     }
 
+    /**
+     * SpaceSplit: the best two-word reading of the word just committed, and
+     * whether it replaces the word now ([PreviousWordDecision.auto]) or is only offered. Null to
+     * leave the word alone. Each option scores ln p(w1 | before) + ln p(w2 | before w1).
+     */
+    suspend fun spaceSplitDecision(
+        split: org.futo.inputmethod.latin.SpaceSplit.Split
+    ): org.futo.inputmethod.latin.PreviousWordDecision? {
+        val s = org.futo.inputmethod.latin.SpaceSplit
+        val request = split.request
+        val model = languageModel ?: return null
+        if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
+        val splits = request.candidates.filter { !it.equals(request.original, ignoreCase = true) }
+        if(splits.isEmpty()) return null
+        val rival = if(split.committedIsWord) request.original else split.rival
+        val options = listOf(rival ?: request.original) + splits
+        val parts = options.map { it.split(' ') }
+        val first = model.firstTokenProbabilitiesForContext(parts.map { it[0] }, request.context) ?: return null
+        val scores = parts.indices.map { i ->
+            var score = ln(maxOf(first[i], 1e-9f).toDouble())
+            for(k in 1 until parts[i].size) {
+                val p = model.firstTokenProbabilitiesForContext(
+                    listOf(parts[i][k]), request.context + " " + parts[i].subList(0, k).joinToString(" ")
+                )?.get(0) ?: return null
+                score += ln(maxOf(p, 1e-9f).toDouble())
+            }
+            score
+        }
+        val best = (1 until options.size).maxByOrNull { scores[it] } ?: return null
+        val lead = if(rival != null) scores[best] - scores[0] else Double.POSITIVE_INFINITY
+        val resplit = request.original.contains(' ')
+        val autoLead = when {
+            resplit -> s.RESPLIT_MIN_LEAD
+            split.committedIsWord -> s.AUTO_MIN_LEAD
+            else -> s.KEPT_AUTO_MIN_LEAD
+        }
+        val auto = split.autoAllowed && lead >= autoLead
+        if(!auto && (resplit || lead < s.OFFER_MIN_LEAD)) return null
+        // Keep a capital the keyboard gave the word (sentence start)
+        val word = options[best].let {
+            if(request.original.first().isUpperCase()) it.replaceFirstChar { c -> c.titlecase() } else it
+        }
+        return org.futo.inputmethod.latin.PreviousWordDecision(word, auto)
+    }
+
     public fun onStartInput() {
         transformerDisabled = false
         numConsecutiveTimeouts = 0

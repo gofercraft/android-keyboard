@@ -40,6 +40,7 @@ import org.futo.inputmethod.latin.LastComposedWord;
 import org.futo.inputmethod.latin.PreviousSwipeRevision;
 import org.futo.inputmethod.latin.PreviousWordOffer;
 import org.futo.inputmethod.latin.StraySpaceMerge;
+import org.futo.inputmethod.latin.SpaceSplit;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -2852,6 +2853,10 @@ public final class InputLogic {
         // A merge is undone by its own backspace path, never by revert-autocorrect
         if (mergedWord != null) mLastComposedWord.deactivate();
         onCommitForSwipeRevision(chosenWord, commitType, committingSwipe);
+        if (mergedWord == null && !committingSwipe
+                && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
+            submitSpaceSplit(chosenWord, settingsValues.mAutoCorrectionEnabledPerUserSettings);
+        }
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
@@ -2885,7 +2890,41 @@ public final class InputLogic {
         }
     }
 
+    /**
+     * SpaceSplit: if the word just committed was typed as a non-word that splits
+     * into two words ("inan"), ask for an LM check of the split.
+     */
+    private void submitSpaceSplit(final String word, final boolean autoAllowed) {
+        if (!SpaceSplit.isEnabled(mImeHelper.getContext())) return;
+        final String typed = mLastComposedWord.mTypedWord;
+        if (typed == null || word == null || word.isEmpty()) return;
+        final java.util.List<String> splits = SpaceSplit.candidates(typed,
+                w -> mDictionaryFacilitator.isValidSpellingWord(w),
+                w -> mDictionaryFacilitator.getWordFrequency(w));
+        if (splits.isEmpty()) return;
+        final CharSequence before = mConnection.getTextBeforeCursor(
+                PreviousSwipeRevision.CONTEXT_CHARS, 0);
+        if (before == null || !before.toString().endsWith(word)) return;
+        final String text = before.toString();
+        final boolean committedIsWord = word.indexOf(' ') >= 0
+                || mDictionaryFacilitator.isValidSpellingWord(word)
+                || mDictionaryFacilitator.isValidSpellingWord(word.toLowerCase(java.util.Locale.ROOT));
+        // The strip's best dictionary word, the split's rival when the typed non-word was kept
+        String rival = null;
+        if (!committedIsWord && mSuggestedWords != null) {
+            for (int i = 0; i < mSuggestedWords.size() && rival == null; i++) {
+                final String w = mSuggestedWords.getWord(i);
+                if (w != null && w.indexOf(' ') < 0 && !w.equalsIgnoreCase(typed)
+                        && mDictionaryFacilitator.isValidSpellingWord(w)) rival = w;
+            }
+        }
+        SpaceSplit.submit(new SpaceSplit.Split(new PreviousSwipeRevision.Request(false, word, splits,
+                java.util.Collections.emptyList(), text.substring(0, text.length() - word.length()),
+                "", "", mConnection.getExpectedSelectionEnd()), committedIsWord, rival, autoAllowed));
+    }
+
     private void clearPreviousWordOffer() {
+        SpaceSplit.cancelPending();
         PreviousSwipeRevision.cancelPending();
         mOfferRequest = null;
         mOfferWord = null;
