@@ -38,6 +38,7 @@ import org.futo.inputmethod.latin.BinaryDictionary;
 import org.futo.inputmethod.latin.DictionaryFacilitator;
 import org.futo.inputmethod.latin.LastComposedWord;
 import org.futo.inputmethod.latin.PreviousSwipeRevision;
+import org.futo.inputmethod.latin.PreviousWordOffer;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -116,6 +117,10 @@ public final class InputLogic {
     // the last revision applied, which the next backspace undoes
     private PreviousSwipeRevision.Swiped mLastSwiped = null;
     private PreviousSwipeRevision.Revision mLastSwipeRevision = null;
+    // PreviousWordOffer: the fix on offer for the previous word, and its chip
+    private PreviousSwipeRevision.Request mOfferRequest = null;
+    private String mOfferWord = null;
+    private SuggestedWordInfo mOfferChip = null;
     
     public final WordComposer mWordComposer;
     public final RichInputConnection mConnection;
@@ -460,6 +465,15 @@ public final class InputLogic {
         // for the sequence of language switching.
         inputTransaction.setDidAffectContents();
 
+        if (mOfferChip != null && suggestionInfo == mOfferChip) {
+            final PreviousSwipeRevision.Request request = mOfferRequest;
+            final String word = mOfferWord;
+            clearPreviousWordOffer();
+            applySwipeRevision(request, word);
+            inputTransaction.setRequiresUpdateSuggestions();
+            return inputTransaction;
+        }
+
         if(suggestionInfo.mKindAndFlags == SuggestedWordInfo.KIND_UNDO) {
             inputTransaction.setRequiresUpdateSuggestions();
 
@@ -668,6 +682,7 @@ public final class InputLogic {
             resetComposingWord(settingsValues, false);
         }
         if (event.mKeyCode != Constants.CODE_DELETE) mLastSwipeRevision = null;
+        clearPreviousWordOffer();
         final Event processedEvent = mWordComposer.processEvent(event);
         final InputTransaction inputTransaction = new InputTransaction(settingsValues,
                 processedEvent, SystemClock.uptimeMillis(), mSpaceState,
@@ -758,6 +773,7 @@ public final class InputLogic {
             final KeyboardSwitcher keyboardSwitcher) {
         mWordBeingCorrectedByCursor = null;
         mLastSwipeRevision = null;
+        clearPreviousWordOffer();
         mInputLogicHandler.onStartBatchInput();
 
         mIme.setNeutralSuggestionStrip();
@@ -2846,7 +2862,8 @@ public final class InputLogic {
             final boolean swiped) {
         final PreviousSwipeRevision.Swiped previous = mLastSwiped;
         mLastSwiped = null;
-        if (!PreviousSwipeRevision.isEnabled(mImeHelper.getContext())) return;
+        clearPreviousWordOffer();
+        if (!PreviousSwipeRevision.isAnyEnabled(mImeHelper.getContext())) return;
         final CharSequence before = mConnection.getTextBeforeCursor(
                 PreviousSwipeRevision.CONTEXT_CHARS, 0);
         if (before == null) return;
@@ -2856,9 +2873,64 @@ public final class InputLogic {
             final PreviousSwipeRevision.Request request = previous.requestFor(word, text, cursor);
             if (request != null) PreviousSwipeRevision.submit(request);
         }
-        if (swiped && commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
-            mLastSwiped = PreviousSwipeRevision.swiped(word, text, cursor);
+        if (commitType != LastComposedWord.COMMIT_TYPE_MANUAL_PICK) {
+            mLastSwiped = swiped ? PreviousSwipeRevision.swiped(word, text, cursor)
+                    : PreviousSwipeRevision.tapped(word, text, cursor);
         }
+    }
+
+    private void clearPreviousWordOffer() {
+        PreviousSwipeRevision.cancelPending();
+        mOfferRequest = null;
+        mOfferWord = null;
+        mOfferChip = null;
+    }
+
+    /** Whether the text and cursor still match the request (the previous word untouched). */
+    private boolean previousWordUntouched(final PreviousSwipeRevision.Request request) {
+        if (mWordComposer.isComposingWord() || mConnection.hasSelection()) return false;
+        final int cursor = mConnection.getExpectedSelectionEnd();
+        final String expected = request.getOriginal() + request.getTail();
+        final int extra = cursor - request.getCursor();
+        if (extra != 0 && extra != 1) return false;
+        final CharSequence before = mConnection.getTextBeforeCursor(expected.length() + extra, 0);
+        if (before == null || !before.toString().startsWith(expected)) return false;
+        return extra == 0 || !Character.isLetterOrDigit(before.charAt(before.length() - 1));
+    }
+
+    /**
+     * PreviousWordOffer: keep a one-tap fix for the previous word. Returns false if
+     * the text changed since the request. Called on the main thread.
+     */
+    public boolean setPreviousWordOffer(final PreviousSwipeRevision.Request request,
+            final String word) {
+        if (!previousWordUntouched(request)) return false;
+        mOfferRequest = request;
+        mOfferWord = word;
+        mOfferChip = new SuggestedWordInfo(PreviousWordOffer.label(request.getOriginal(), word), "",
+                Integer.MAX_VALUE, SuggestedWordInfo.KIND_CORRECTION, null,
+                SuggestedWordInfo.NOT_AN_INDEX, SuggestedWordInfo.NOT_A_CONFIDENCE);
+        return true;
+    }
+
+    /** The strip with the offer chip first, while the offer is still valid. */
+    public SuggestedWords withPreviousWordOffer(final SuggestedWords words) {
+        if (mOfferChip == null) return words;
+        if (!previousWordUntouched(mOfferRequest)) {
+            clearPreviousWordOffer();
+            return words;
+        }
+        if (words != null && !words.isEmpty() && !words.isPrediction()) return words;
+        if (words != null) {
+            for (final SuggestedWordInfo info : words.mSuggestedWordInfoList) {
+                if (info == mOfferChip) return words;
+            }
+        }
+        final ArrayList<SuggestedWordInfo> list = new ArrayList<>();
+        list.add(mOfferChip);
+        if (words != null) list.addAll(words.mSuggestedWordInfoList);
+        return new SuggestedWords(list, null, null, false, false, false,
+                SuggestedWords.INPUT_STYLE_PREDICTION, words != null ? words.mSequenceNumber : 0);
     }
 
     /**

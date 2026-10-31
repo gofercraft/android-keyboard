@@ -210,10 +210,27 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
 
     override fun onCreate() {
         languageModelFacilitator.launchProcessor()
-        org.futo.inputmethod.latin.PreviousSwipeRevision.engine = { request ->
-            helper.lifecycleScope.launch(languageModelFacilitator.languageModelScope) {
-                val revised = languageModelFacilitator.revisePreviousSwipe(request) ?: return@launch
-                withContext(Dispatchers.Main) { inputLogic.applySwipeRevision(request, revised) }
+        org.futo.inputmethod.latin.PreviousSwipeRevision.engine = engine@{ request ->
+            val r = org.futo.inputmethod.latin.PreviousSwipeRevision
+            val offers = context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSetting)
+            val useful = if(request.swiped) r.isEnabled(context)
+                    || (offers && context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSwipedSetting))
+                else offers
+            if(!useful) return@engine
+            // Not on languageModelScope: each model call takes that thread on its own, so the
+            // next word's keystrokes can run between them. The next keystroke cancels it.
+            r.cancelPending()
+            r.pending = helper.lifecycleScope.launch(Dispatchers.Default) {
+                val decision = languageModelFacilitator.previousWordDecision(request) ?: return@launch
+                withContext(Dispatchers.Main) {
+                    if(decision.auto && org.futo.inputmethod.latin.PreviousSwipeRevision.isEnabled(context)) {
+                        inputLogic.applySwipeRevision(request, decision.word)
+                    } else if(context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSetting)
+                        && (!request.swiped || context.getSetting(org.futo.inputmethod.latin.PreviousWordOfferSwipedSetting))
+                        && inputLogic.setPreviousWordOffer(request, decision.word)) {
+                        showSuggestionStrip(inputLogic.withPreviousWordOffer(inputLogic.mSuggestedWords))
+                    }
+                }
             }
         }
         if (context.isDirectBootUnlocked) onDeviceUnlocked()
@@ -444,7 +461,7 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
             )
         }
 
-        showSuggestionStrip(words)
+        showSuggestionStrip(inputLogic.withPreviousWordOffer(words))
         when(inputStyle) {
             SuggestedWords.INPUT_STYLE_TAIL_BATCH -> {
                 val updateBatch = {

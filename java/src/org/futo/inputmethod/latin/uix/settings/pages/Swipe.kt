@@ -251,6 +251,18 @@ val SwipeMenu = UserSettingsMenu(
             setting = org.futo.inputmethod.latin.PreviousSwipeRevisionSetting,
         ),
 
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_previous_word_offer,
+            subtitle = R.string.swipe_settings_previous_word_offer_subtitle,
+            setting = org.futo.inputmethod.latin.PreviousWordOfferSetting,
+        ),
+
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_previous_word_offer_swiped,
+            subtitle = R.string.swipe_settings_previous_word_offer_swiped_subtitle,
+            setting = org.futo.inputmethod.latin.PreviousWordOfferSwipedSetting,
+        ),
+
         userSettingToggleSharedPrefs(
             title = R.string.swipe_settings_sensitive_swipe,
             subtitle = R.string.swipe_settings_sensitive_swipe_subtitle,

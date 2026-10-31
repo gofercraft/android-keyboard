@@ -567,11 +567,14 @@ public class LanguageModelFacilitator(
         if(tx.isEmpty()) return null
 
         val list = words.mSuggestedWordInfoList
+        val tapScores = DoubleArray(list.size)
         val pick = TapShapeReranker.choose(
             tx.toFloatArray(), ty.toFloatArray(), keys,
             Array(list.size) { list[it].mWord }, IntArray(list.size) { list[it].mScore },
-            if(words.mWillAutoCorrect) 1 else 0, words.mTypedWordValid
+            if(words.mWillAutoCorrect) 1 else 0, words.mTypedWordValid, tapScores
         )
+        val top4 = list.indices.filter { !tapScores[it].isNaN() }.sortedByDescending { tapScores[it] }.take(4)
+        org.futo.inputmethod.latin.LastTapShapeScores.set(top4.map { list[it].mWord }, top4.map { tapScores[it] })
         if(pick < 0) return null
         if(forced) return null
 
@@ -804,31 +807,54 @@ public class LanguageModelFacilitator(
      * the revised spelling of the previous swiped word, or null to keep it. Scores
      * SwipeShapeReranker's top 4 by shape score + WORD_WEIGHT ln p(word | before) + NEXT_WEIGHT ln p(next | before + word).
      */
-    suspend fun revisePreviousSwipe(request: org.futo.inputmethod.latin.PreviousSwipeRevision.Request): String? {
+    /**
+     * what to do with the previous word once the next word is known. Scores the
+     * candidates (SwipeShapeReranker's top 4 for a swipe, TapShapeReranker's top 4 for a tapped word) by shape/tap
+     * score + w1 ln p(word | before) + w2 ln p(next | before + word). Returns the best other
+     * word, and whether it clears PreviousSwipeRevision's auto-revise guards (swipes only) or only the
+     * PreviousWordOffer offer threshold. Null to leave the word alone.
+     */
+    suspend fun previousWordDecision(
+        request: org.futo.inputmethod.latin.PreviousSwipeRevision.Request
+    ): org.futo.inputmethod.latin.PreviousWordDecision? {
         val r = org.futo.inputmethod.latin.PreviousSwipeRevision
+        val o = org.futo.inputmethod.latin.PreviousWordOffer
         val model = languageModel ?: return null
         if(dictionaryFacilitator.mostConfidentLocale != model.locale) return null
         val words = request.candidates
         val shape = request.shapeScores
-        if(words.size < 2 || shape[0] - shape[1] >= r.MAX_SHAPE_MARGIN) return null
+        if(words.size < 2) return null
+        // A clear shape/tap winner is left alone, before any model call
+        if(shape[0] - shape[1] >= (if(request.swiped) r.MAX_SHAPE_MARGIN else o.TAP_MAX_SHAPE_MARGIN)) return null
+        val current = words.indexOfFirst { it.equals(request.original, ignoreCase = true) }
+        if(current < 0) return null
+        val w1 = if(request.swiped) r.WORD_WEIGHT else o.TAP_WORD_WEIGHT
+        val w2 = if(request.swiped) r.NEXT_WEIGHT else o.TAP_NEXT_WEIGHT
         val pWord = model.firstTokenProbabilitiesForContext(words, request.context) ?: return null
-        val scores = words.indices.map { i ->
+        val partial = words.indices.map { shape[it] + w1 * ln(maxOf(pWord[it], 1e-9f).toDouble()) }
+        // p(next | ...) only for the word on screen and the best 2 others: 4 model calls, not 5
+        val others = words.indices
+            .filter { !r.sameBareWord(words[it], request.original) }
+            .sortedByDescending { partial[it] }.take(o.NEXT_SCORED_OTHERS)
+        if(others.isEmpty()) return null
+        val scores = DoubleArray(words.size) { Double.NEGATIVE_INFINITY }
+        for(i in others + current) {
             val pNext = model.firstTokenProbabilitiesForContext(
                 listOf(request.next), request.context + " " + words[i]
             )?.get(0) ?: return null
-            shape[i] + r.WORD_WEIGHT * ln(maxOf(pWord[i], 1e-9f).toDouble()) +
-                    r.NEXT_WEIGHT * ln(maxOf(pNext, 1e-9f).toDouble())
+            scores[i] = partial[i] + w2 * ln(maxOf(pNext, 1e-9f).toDouble())
         }
-        val bestIndex = scores.indices.maxByOrNull { scores[it] } ?: return null
-        val best = words[bestIndex]
-        if(r.sameBareWord(best, request.original)) return null
-        // Precision guards: short words only, and a clear win over the word on screen
-        val current = words.indexOfFirst { it.equals(request.original, ignoreCase = true) }
-        if(current < 0 || scores[bestIndex] - scores[current] < r.MIN_SCORE_LEAD) return null
-        if(maxOf(best.length, request.original.length) > r.MAX_WORD_LENGTH) return null
+        val bestIndex = others.maxByOrNull { scores[it] } ?: return null
+        val lead = scores[bestIndex] - scores[current]
         // Keep a capital the keyboard gave the original (sentence start)
-        return if(request.original.first().isUpperCase() && best.first().isLowerCase())
-            best.replaceFirstChar { it.titlecase() } else best
+        val best = words[bestIndex].let {
+            if(request.original.first().isUpperCase() && it.first().isLowerCase()) it.replaceFirstChar { c -> c.titlecase() } else it
+        }
+        val auto = request.swiped && lead >= r.MIN_SCORE_LEAD &&
+                maxOf(best.length, request.original.length) <= r.MAX_WORD_LENGTH
+        val offerGap = if(request.swiped) o.SWIPE_OFFER_MIN_LEAD else o.TAP_OFFER_MIN_LEAD
+        if(!auto && lead < offerGap) return null
+        return org.futo.inputmethod.latin.PreviousWordDecision(best, auto)
     }
 
     public fun onStartInput() {

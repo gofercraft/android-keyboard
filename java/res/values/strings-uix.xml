@@ -552,6 +552,10 @@
     <string name="swipe_settings_transformer_rescore_subtitle">Weigh how well each swipe suggestion fits the previous words (slightly slower)</string>
     <string name="swipe_settings_previous_swipe_revision">Fix the previous swiped word</string>
     <string name="swipe_settings_previous_swipe_revision_subtitle">After the next word, change a swiped word that fits better, such as to much to too much. Backspace undoes it</string>
+    <string name="swipe_settings_previous_word_offer">Offer a fix for the previous word</string>
+    <string name="swipe_settings_previous_word_offer_subtitle">After the next word, suggest a better fit for the word before it, such as to \u2192 too, for typed words</string>
+    <string name="swipe_settings_previous_word_offer_swiped">Also offer fixes for swiped words</string>
+    <string name="swipe_settings_previous_word_offer_swiped_subtitle">Only when the fix is clearly better. Needs the option above</string>
     <string name="swipe_settings_shape_rerank_subtitle">Re-rank swipe suggestions by how well each word fits the gesture\'s shape</string>
 
     <string name="swipe_settings_sensitive_swipe">Increase sensitivity</string>

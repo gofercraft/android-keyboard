@@ -41,6 +41,7 @@ object PreviousSwipeRevision {
 
     /** A swiped word waiting for the next word. */
     class Swiped(
+        val swiped: Boolean,
         val word: String,
         val candidates: List<String>,
         val shapeScores: List<Double>,
@@ -57,11 +58,12 @@ object PreviousSwipeRevision {
             if (cursorNow != cursor + tail.length) return null
             val before = text.substring(0, text.length - (word + tail).length)
             if (!textBefore.endsWith(before.takeLast(minOf(before.length, textBefore.length)))) return null
-            return Request(word, candidates, shapeScores, textBefore, next, tail, cursorNow)
+            return Request(swiped, word, candidates, shapeScores, textBefore, next, tail, cursorNow)
         }
     }
 
     class Request(
+        val swiped: Boolean,
         val original: String,
         val candidates: List<String>,
         val shapeScores: List<Double>,
@@ -82,6 +84,14 @@ object PreviousSwipeRevision {
 
     @JvmStatic fun isEnabled(context: Context): Boolean = context.getSetting(PreviousSwipeRevisionSetting)
 
+    /** PreviousSwipeRevision (auto-revise swipes) or PreviousWordOffer (offer a fix) is on. */
+    @JvmStatic fun isAnyEnabled(context: Context): Boolean =
+        isEnabled(context) || context.getSetting(PreviousWordOfferSetting)
+
+    /** The decision still running for the previous word, if any. */
+    @Volatile var pending: kotlinx.coroutines.Job? = null
+    @JvmStatic fun cancelPending() { pending?.cancel(); pending = null }
+
     /**
      * Remember a swiped word just committed by the keyboard, with SwipeShapeReranker's candidates for it.
      * [text] is the text before the cursor, ending with [word].
@@ -90,7 +100,15 @@ object PreviousSwipeRevision {
         val (words, scores) = LastSwipeShapeScores.forRevision() ?: return null
         if (words.size < 2 || words.none { it.equals(word, ignoreCase = true) }) return null
         if (!text.endsWith(word)) return null
-        return Swiped(word, words, scores, text.substring(0, text.length - word.length), cursor)
+        return Swiped(true, word, words, scores, text.substring(0, text.length - word.length), cursor)
+    }
+
+    /** As [swiped], for a word the keyboard committed from taps (TapShapeReranker's candidates). */
+    @JvmStatic fun tapped(word: String, text: String, cursor: Int): Swiped? {
+        val (words, scores) = LastTapShapeScores.take() ?: return null
+        if (words.size < 2 || words.none { it.equals(word, ignoreCase = true) }) return null
+        if (!text.endsWith(word)) return null
+        return Swiped(false, word, words, scores, text.substring(0, text.length - word.length), cursor)
     }
 
     @JvmStatic fun submit(request: Request) { engine?.invoke(request) }

@@ -43,6 +43,17 @@ public final class TapShapeReranker {
     public static int choose(final float[] tx, final float[] ty, final Map<Character, float[]> keys,
                              final String[] words, final int[] scores, final int futoChoice,
                              final boolean typedValid) {
+        return choose(tx, ty, keys, words, scores, futoChoice, typedValid, null);
+    }
+
+    /**
+     * As above. If outScores is not null (same length as words) it receives every scored word's
+     * score, NaN for words not scored (case duplicates, no letters, or an early exit).
+     */
+    public static int choose(final float[] tx, final float[] ty, final Map<Character, float[]> keys,
+                             final String[] words, final int[] scores, final int futoChoice,
+                             final boolean typedValid, final double[] outScores) {
+        if (outScores != null) java.util.Arrays.fill(outScores, Double.NaN);
         final int n = Math.min(tx.length, ty.length);
         if (n == 0 || words.length < 2 || futoChoice < 0 || futoChoice >= words.length) return -1;
 
@@ -87,6 +98,7 @@ public final class TapShapeReranker {
             f[4] = (float) Math.log(i + 1);
             double s = 0;
             for (int j = 0; j < W.length; j++) s += W[j] * (f[j] - MU[j]) / SD[j];
+            if (outScores != null) outScores[i] = s;
             if (s > best) { best = s; bestIndex = i; }
             if (isFuto) futoScore = s;
         }
