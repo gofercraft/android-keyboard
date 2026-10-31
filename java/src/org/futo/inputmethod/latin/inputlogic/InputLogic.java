@@ -44,6 +44,7 @@ import org.futo.inputmethod.latin.PreviousWordOffer;
 import org.futo.inputmethod.latin.StraySpaceMerge;
 import org.futo.inputmethod.latin.SpaceSplit;
 import org.futo.inputmethod.latin.ApostrophePairs;
+import org.futo.inputmethod.latin.KeepRetypedWord;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -1509,6 +1510,14 @@ public final class InputLogic {
                 return;
             }
             if (mLastComposedWord.canRevertCommit()
+                    && !inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect
+                    && !mWordComposer.isBatchMode()) {
+                // Backspacing into an autocorrection: remember what was typed (KeepRetypedWord)
+                KeepRetypedWord.onCorrectionDeleted(
+                        mLastComposedWord.mTypedWord == null ? null : mLastComposedWord.mTypedWord.toString(),
+                        mLastComposedWord.mCommittedWord.toString());
+            }
+            if (mLastComposedWord.canRevertCommit()
                     && inputTransaction.mSettingsValues.mBackspaceUndoesAutocorrect) {
                 final String lastComposedWord = mLastComposedWord.mTypedWord;
                 revertCommit(inputTransaction, inputTransaction.mSettingsValues);
@@ -2763,8 +2772,16 @@ public final class InputLogic {
             return false;
         }
 
-        final SuggestedWordInfo autoCorrectionOrNull = mWordComposer.getAutoCorrectionOrNull();
         final String typedWord = mWordComposer.getTypedWord();
+        // The user deleted an autocorrection and typed their own spelling again, now or earlier:
+        // keep it, and commit it like a strip pick, so no later fix (stray space, missed space,
+        // apostrophe) changes it either
+        final boolean retypedNow = !mWordComposer.isBatchMode() && KeepRetypedWord.matches(typedWord);
+        final boolean keepRetyped = retypedNow
+                || (!mWordComposer.isBatchMode() && KeepRetypedWord.isKept(typedWord));
+        if (retypedNow) KeepRetypedWord.remember(mImeHelper.getContext(), typedWord);
+        final SuggestedWordInfo autoCorrectionOrNull =
+                keepRetyped ? null : mWordComposer.getAutoCorrectionOrNull();
         final String stringToCommit = (autoCorrectionOrNull != null)
                 ? autoCorrectionOrNull.mWord : typedWord;
         if (stringToCommit != null) {
@@ -2773,8 +2790,12 @@ public final class InputLogic {
                         + "is empty? Impossible! I must commit suicide.");
             }
             final boolean isBatchMode = mWordComposer.isBatchMode();
+            if (keepRetyped) KeepRetypedWord.setLearnNow(typedWord);
             commitChosenWord(settingsValues, stringToCommit,
-                    LastComposedWord.COMMIT_TYPE_DECIDED_WORD, separator, 0);
+                    keepRetyped ? LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                            : LastComposedWord.COMMIT_TYPE_DECIDED_WORD,
+                    separator, keepRetyped ? 3 : 0);
+            KeepRetypedWord.setLearnNow(null);
             if (!typedWord.equals(stringToCommit)) {
                 // This will make the correction flash for a short while as a visual clue
                 // to the user that auto-correction happened. It has no other effect; in particular
@@ -2808,6 +2829,7 @@ public final class InputLogic {
      */
     private void commitChosenWord(final SettingsValues settingsValues, String chosenWord,
             final int commitType, final String separatorString, final int importance) {
+        KeepRetypedWord.clear(); // any commit ends the window for a retyped word
         long startTimeMillis = 0;
         if (DebugFlags.DEBUG_ENABLED) {
             startTimeMillis = System.currentTimeMillis();
