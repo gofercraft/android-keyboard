@@ -463,6 +463,8 @@
     <string name="typing_settings_learn_kept_words_subtitle">Remember a new word the first time you keep it (pick it from the suggestions or undo a correction)</string>
     <string name="typing_settings_keep_retyped_word">Keep a word you retype</string>
     <string name="typing_settings_keep_retyped_word_subtitle">If you delete an autocorrection and type your own spelling again, keep it and remember it</string>
+    <string name="typing_settings_keep_careful_taps">Keep slow, careful typing</string>
+    <string name="typing_settings_keep_careful_taps_subtitle">If you tap a word slowly, one letter at a time near the middle of each key, keep it exactly as typed</string>
     <string name="typing_settings_supplement_dictionary_subtitle">Suggest common chat words and abbreviations missing from the main dictionary (idk, TV, lol)</string>
     <string name="typing_settings_vibration_strength">Vibration</string>
     <string name="typing_settings_vibration_strength_default">Default</string>

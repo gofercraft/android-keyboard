@@ -134,6 +134,7 @@ import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.v2keyboard.KeyboardSettings
 import org.futo.inputmethod.latin.SupplementDictionarySetting
 import org.futo.inputmethod.latin.KeepRetypedWordSetting
+import org.futo.inputmethod.latin.KeepCarefulTapsSetting
 import org.futo.inputmethod.latin.LearnKeptWordsSetting
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
@@ -889,6 +890,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             title = R.string.typing_settings_keep_retyped_word,
             subtitle = R.string.typing_settings_keep_retyped_word_subtitle,
             setting = KeepRetypedWordSetting
+        ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_keep_careful_taps,
+            subtitle = R.string.typing_settings_keep_careful_taps_subtitle,
+            setting = KeepCarefulTapsSetting
         ),
         userSettingToggleSharedPrefs(
             title = R.string.auto_cap,

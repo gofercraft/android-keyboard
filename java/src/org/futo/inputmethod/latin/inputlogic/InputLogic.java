@@ -45,6 +45,7 @@ import org.futo.inputmethod.latin.StraySpaceMerge;
 import org.futo.inputmethod.latin.SpaceSplit;
 import org.futo.inputmethod.latin.ApostrophePairs;
 import org.futo.inputmethod.latin.KeepRetypedWord;
+import org.futo.inputmethod.latin.KeepCarefulTaps;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -1203,6 +1204,7 @@ public final class InputLogic {
         }
         if (isComposingWord) {
             mWordComposer.applyProcessedEvent(event);
+            KeepCarefulTaps.onLetter(mWordComposer.size(), SystemClock.uptimeMillis());
             // If it's the first letter, make note of auto-caps state
             if (mWordComposer.isSingleLetter()) {
                 mWordComposer.setCapitalizedModeAtStartComposingTime(inputTransaction.mShiftState);
@@ -2780,8 +2782,15 @@ public final class InputLogic {
         final boolean keepRetyped = retypedNow
                 || (!mWordComposer.isBatchMode() && KeepRetypedWord.isKept(typedWord));
         if (retypedNow) KeepRetypedWord.remember(mImeHelper.getContext(), typedWord);
+        // Every tap slow and near the middle of its key: the user means this spelling
+        // (KeepCarefulTaps). Only matters when autocorrect would change the word.
+        final boolean keepCareful = !keepRetyped && !mWordComposer.isBatchMode()
+                && !mWordComposer.isResumed()
+                && mWordComposer.getAutoCorrectionOrNull() != null
+                && KeepCarefulTaps.isCareful(typedWord, mWordComposer.getInputPointers(),
+                        KeyboardSwitcher.getInstance().getKeyboard());
         final SuggestedWordInfo autoCorrectionOrNull =
-                keepRetyped ? null : mWordComposer.getAutoCorrectionOrNull();
+                (keepRetyped || keepCareful) ? null : mWordComposer.getAutoCorrectionOrNull();
         final String stringToCommit = (autoCorrectionOrNull != null)
                 ? autoCorrectionOrNull.mWord : typedWord;
         if (stringToCommit != null) {
@@ -2792,7 +2801,7 @@ public final class InputLogic {
             final boolean isBatchMode = mWordComposer.isBatchMode();
             if (keepRetyped) KeepRetypedWord.setLearnNow(typedWord);
             commitChosenWord(settingsValues, stringToCommit,
-                    keepRetyped ? LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                    (keepRetyped || keepCareful) ? LastComposedWord.COMMIT_TYPE_MANUAL_PICK
                             : LastComposedWord.COMMIT_TYPE_DECIDED_WORD,
                     separator, keepRetyped ? 3 : 0);
             KeepRetypedWord.setLearnNow(null);
