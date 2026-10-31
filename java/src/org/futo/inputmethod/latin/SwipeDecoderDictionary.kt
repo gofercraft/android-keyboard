@@ -342,6 +342,36 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         return decoder
     }
 
+    /**
+     * Re-orders the decoder's candidates with SwipeShapeReranker and keeps the first 4, as
+     * before. The decoder's score values are kept in descending order and handed out by the new
+     * rank, so everything downstream sees the same score range as without re-ranking.
+     * Uses raw pointer coordinates in keyboard pixels, never a smoothed path.
+     */
+    private fun shapeReranked(
+        seg: InputPointers.GestureSegment, kb: Keyboard, words: List<String>, scores: List<Float>
+    ): List<Pair<String, Float>> {
+        val keyUnit = kb.mBaseWidth / 10.0f
+        val n = seg.x.length
+        if(n == 0 || keyUnit <= 0f) return words.zip(scores).take(4)
+        val xs = FloatArray(n) { seg.x.primitiveArray[it] / keyUnit }
+        val ys = FloatArray(n) { seg.y.primitiveArray[it] / keyUnit }
+        val t0 = seg.t.primitiveArray[0]
+        val ts = FloatArray(n) { (seg.t.primitiveArray[it] - t0).toFloat() }
+        val keys = HashMap<Char, FloatArray>()
+        kb.sortedKeys.forEach {
+            val c = Character.toLowerCase(it.swipeCode)
+            if(c in 'a'.code..'z'.code && !keys.containsKey(c.toChar())) {
+                keys[c.toChar()] = floatArrayOf(
+                    (it.x + it.width / 2.0f) / keyUnit, (it.y + it.height / 2.0f) / keyUnit
+                )
+            }
+        }
+        val order = SwipeShapeReranker.rerank(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
+        val sortedScores = scores.sortedDescending()
+        return order.take(4).mapIndexed { rank, i -> words[i] to sortedScores[rank] }
+    }
+
     override fun getNextValidCodePoints(composedData: ComposedData?): ArrayList<Int> {
         return arrayListOf()
     }
@@ -457,7 +487,11 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
             else -> BeamValues.highBeam
         }
 
-        val topK = if(useHighBeam) 4 else 1
+        // at gesture end, take a longer list and re-rank it by gesture shape.
+        val shapeRerank = useHighBeam && !isMultiSwipe && context.getSetting(SwipeShapeRerankSetting)
+                && shapeRerankApplies(appliedLayoutInfo, locale)
+        if(shapeRerank) SwipeShapeReranker.setStrict(context.getSetting(SwipeShapeStrictSetting))
+        val topK = if(useHighBeam) (if(shapeRerank) SHAPE_RERANK_TOP_K else 4) else 1
 
         val results = synchronized(BinaryDictionary.sTrieUsageLock) {
             if(appliedTries?.isEmpty() != false) {
@@ -508,10 +542,16 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
             Log.d("SwipeDecoderDictionary", "outputs = ${results.joinToString { "Word(\"${it.word}\", score=${it.score}, lm=${it.lmScore}, ctc=${it.ctcScore})" }}")
         }
 
-        val list = ArrayList<SuggestedWords.SuggestedWordInfo>(results.size)
-        results.forEach {
+        val ranked: List<Pair<String, Float>> = if(shapeRerank && results.size > 1) {
+            shapeReranked(segments.first(), kb, results.map { it.word }, results.map { it.score })
+        } else {
+            results.map { it.word to it.score }
+        }
+
+        val list = ArrayList<SuggestedWords.SuggestedWordInfo>(ranked.size)
+        ranked.forEach { (word, score) ->
             list.add(SuggestedWords.SuggestedWordInfo(
-                it.word, "", (it.score * 1000.0f + 10000.0f).toInt(), SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
+                word, "", (score * 1000.0f + 10000.0f).toInt(), SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
             ).apply {
                 mOriginatesFromSwipeModel = true
             })
@@ -558,3 +598,22 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         appliedTries = null
     }
 }
+
+// SwipeShapeReranker: re-rank the swipe decoder's list using the gesture's shape (path length
+// against each word's length, end points, headings, ...). Offline on 23,355 real held-out swipes
+// (swipe.futo.org swipe-2): top-1 90.25% -> 93.07%; on swipe-5: 91.02% -> 92.67%.
+/**
+ * The shape re-ranker's weights were fitted to the scores of FUTO's English decoder and context
+ * model. On the generic decoder path it loses: swipe-5 German -1.3 to -3.0 points, Spanish -2.7,
+ * French -0.8 to -1.5, and English itself -1.8. So it runs only when that decoder is applied.
+ */
+internal fun shapeRerankApplies(layout: LayoutInfoForModel, locale: Locale): Boolean =
+    layout.decoder.isNotEmpty() && locale.language == "en"
+
+val SwipeShapeRerankSetting = SettingsKey(booleanPreferencesKey("swipe_shape_rerank"), true)
+
+/** Swipe shape re-ranking overturns the decoder's first word only on a larger lead (0.5, not 0.15). */
+val SwipeShapeStrictSetting = SettingsKey(booleanPreferencesKey("swipe_shape_strict"), true)
+
+/** How many decoder candidates the shape re-ranker looks at (the decoder's beam stays 300). */
+const val SHAPE_RERANK_TOP_K = 16

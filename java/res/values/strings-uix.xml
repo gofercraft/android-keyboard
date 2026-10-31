@@ -541,6 +541,8 @@
     <string name="swipe_settings_title">Swipe Typing</string>
     <string name="swipe_settings_enable_swipe_typing">Enable swipe typing</string>
     <string name="swipe_settings_enable_swipe_typing_subtitle">Allow swiping from key to key to write words.</string>
+    <string name="swipe_settings_shape_rerank">Use swipe shape to pick the word</string>
+    <string name="swipe_settings_shape_rerank_subtitle">Re-rank swipe suggestions by how well each word fits the gesture\'s shape</string>
 
     <string name="swipe_settings_sensitive_swipe">Increase sensitivity</string>
     <string name="swipe_settings_sensitive_swipe_subtitle">Make swipe trigger more often</string>
@@ -712,4 +714,6 @@ Default is %1$s</string>
     <string name="personal_dictionary_delete_additional_file">Delete extra dictionary file?</string>
     <!-- %1$s will be replaced with the custom dictionary name -->
     <string name="personal_dictionary_delete_additional_file_text">%1$s will be deleted</string>
+    <string name="swipe_settings_shape_strict">Stricter swipe shape</string>
+    <string name="swipe_settings_shape_strict_subtitle">Shape re-ranking keeps the first suggestion of the decoder unless the shape clearly favours another word. Fewer wrong changes, a few fewer rare-word fixes</string>
 </resources>
