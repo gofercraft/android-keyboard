@@ -39,6 +39,7 @@ import org.futo.inputmethod.latin.DictionaryFacilitator;
 import org.futo.inputmethod.latin.LastComposedWord;
 import org.futo.inputmethod.latin.PreviousSwipeRevision;
 import org.futo.inputmethod.latin.PreviousWordOffer;
+import org.futo.inputmethod.latin.StraySpaceMerge;
 import org.futo.inputmethod.latin.NgramContext;
 import org.futo.inputmethod.latin.RichInputConnection;
 import org.futo.inputmethod.latin.Suggest;
@@ -2790,7 +2791,7 @@ public final class InputLogic {
      * @param commitType the type of the commit, as one of LastComposedWord.COMMIT_TYPE_*
      * @param separatorString the separator that's causing the commit, or NOT_A_SEPARATOR if none.
      */
-    private void commitChosenWord(final SettingsValues settingsValues, final String chosenWord,
+    private void commitChosenWord(final SettingsValues settingsValues, String chosenWord,
             final int commitType, final String separatorString, final int importance) {
         long startTimeMillis = 0;
         if (DebugFlags.DEBUG_ENABLED) {
@@ -2824,6 +2825,9 @@ public final class InputLogic {
         }
         final boolean committingSwipe = mWordComposer.isBatchMode();
         mConnection.commitText(chosenWordWithSuggestions, 1);
+        final String mergedWord = committingSwipe || commitType == LastComposedWord.COMMIT_TYPE_MANUAL_PICK
+                ? null : mergeStraySpace(chosenWord, separatorString);
+        if (mergedWord != null) chosenWord = mergedWord;
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
             Log.d(TAG, "commitChosenWord() : " + runTimeMillis + " ms to run "
@@ -2844,7 +2848,9 @@ public final class InputLogic {
         // LastComposedWord#didCommitTypedWord by string equality of the remembered
         // strings.
         mLastComposedWord = mWordComposer.commitWord(commitType,
-                chosenWordWithSuggestions, separatorString, ngramContext);
+                mergedWord != null ? mergedWord : chosenWordWithSuggestions, separatorString, ngramContext);
+        // A merge is undone by its own backspace path, never by revert-autocorrect
+        if (mergedWord != null) mLastComposedWord.deactivate();
         onCommitForSwipeRevision(chosenWord, commitType, committingSwipe);
         if (DebugFlags.DEBUG_ENABLED) {
             long runTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -2964,6 +2970,32 @@ public final class InputLogic {
         mLastSwipeRevision = new PreviousSwipeRevision.Revision(request.getOriginal(), revised,
                 request.getTail() + extra, mConnection.getExpectedSelectionEnd());
         mLastSwiped = null;
+    }
+
+    /**
+     * StraySpaceMerge: [chosen] was just committed after the previous word and one
+     * space. If the two pieces as typed join into a word ("atta cked"), replace both with it and
+     * return it; backspace right after the separator undoes it. Otherwise null.
+     */
+    private String mergeStraySpace(final String chosen, final String separatorString) {
+        final LastComposedWord previous = mLastComposedWord;
+        if (previous == LastComposedWord.NOT_A_COMPOSED_WORD || !" ".equals(previous.mSeparatorString)
+                || previous.mCommittedWord == null || mConnection.hasSelection()) return null;
+        if (!StraySpaceMerge.isEnabled(mImeHelper.getContext())) return null;
+        final String merged = StraySpaceMerge.merged(previous.mTypedWord, mWordComposer.getTypedWord(),
+                word -> mDictionaryFacilitator.isValidSpellingWord(word));
+        if (merged == null) return null;
+        final String original = previous.mCommittedWord + " " + chosen;
+        final CharSequence before = mConnection.getTextBeforeCursor(original.length(), 0);
+        if (before == null || !before.toString().equals(original)) return null;
+        final int start = mConnection.getExpectedSelectionEnd() - original.length();
+        mConnection.deleteTextBeforeCursor(original.length());
+        mConnection.commitText(merged, 1);
+        mConnection.commitCorrection(new CorrectionInfo(start, original, merged));
+        final String after = separatorString == null ? "" : separatorString;
+        mLastSwipeRevision = new PreviousSwipeRevision.Revision(original, merged, after,
+                mConnection.getExpectedSelectionEnd() + after.length());
+        return merged;
     }
 
     /** Backspace right after a revision restores the original swiped word. */

@@ -902,6 +902,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             }
         ),
         userSettingToggleDataStore(
+            title = R.string.typing_settings_stray_space_merge,
+            subtitle = R.string.typing_settings_stray_space_merge_subtitle,
+            setting = org.futo.inputmethod.latin.StraySpaceMergeSetting
+        ),
+        userSettingToggleDataStore(
             title = R.string.typing_settings_tap_shape_rerank,
             subtitle = R.string.typing_settings_tap_shape_rerank_subtitle,
             setting = org.futo.inputmethod.latin.xlm.TapShapeRerankSetting
