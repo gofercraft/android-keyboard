@@ -233,6 +233,22 @@ val LegacySwipeSetting = SettingsKey(booleanPreferencesKey("swipe_mode_legacy"),
 val DisplayTop4Setting = SettingsKey(booleanPreferencesKey("swipe_use_top4_suggestions"), true)
 
 val SwipeSpecialDecoderSetting = SettingsKey(booleanPreferencesKey("__experimental_swipe_special_decoder"), true)
+
+// a very short gesture over "a" or "i" means the one-letter word.
+// Offline on 23,355 real held-out swipes: one-letter words 0.5% -> 88.1%, overall top-1 90.25% -> 92.5%.
+val OneLetterSwipeSetting = SettingsKey(booleanPreferencesKey("one_letter_swipe"), true)
+
+/** Gesture shorter than this many key widths (raw, unsmoothed touch points) counts as a one-letter swipe. */
+const val ONE_LETTER_MAX_PATH_KEY_WIDTHS = 0.5f
+
+private val ONE_LETTER_WORDS = mapOf('a'.code to "a", 'i'.code to "I")
+
+/**
+ * Languages whose one-letter swipe words are known. Others get no one-letter word: in French the
+ * short swipe on a means "à" as often as "a" (swipe-5: 8 fixed, 33 broken), and German has none.
+ */
+private val ONE_LETTER_LANGUAGES = setOf("en")
+
 val SwipeLanguageModelSetting = SettingsKey(booleanPreferencesKey("__experimental_swipe_language_model"), true)
 
 @Serializable
@@ -340,6 +356,36 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         applyPendingLayoutInfo()
 
         return decoder
+    }
+
+    /**
+     * Re-orders the decoder's candidates with SwipeShapeReranker and keeps the first 4, as
+     * before. The decoder's score values are kept in descending order and handed out by the new
+     * rank, so everything downstream sees the same score range as without re-ranking.
+     * Uses raw pointer coordinates in keyboard pixels, never a smoothed path.
+     */
+    private fun shapeReranked(
+        seg: InputPointers.GestureSegment, kb: Keyboard, words: List<String>, scores: List<Float>
+    ): List<Pair<String, Float>> {
+        val keyUnit = kb.mBaseWidth / 10.0f
+        val n = seg.x.length
+        if(n == 0 || keyUnit <= 0f) return words.zip(scores).take(4)
+        val xs = FloatArray(n) { seg.x.primitiveArray[it] / keyUnit }
+        val ys = FloatArray(n) { seg.y.primitiveArray[it] / keyUnit }
+        val t0 = seg.t.primitiveArray[0]
+        val ts = FloatArray(n) { (seg.t.primitiveArray[it] - t0).toFloat() }
+        val keys = HashMap<Char, FloatArray>()
+        kb.sortedKeys.forEach {
+            val c = Character.toLowerCase(it.swipeCode)
+            if(c in 'a'.code..'z'.code && !keys.containsKey(c.toChar())) {
+                keys[c.toChar()] = floatArrayOf(
+                    (it.x + it.width / 2.0f) / keyUnit, (it.y + it.height / 2.0f) / keyUnit
+                )
+            }
+        }
+        val order = SwipeShapeReranker.rerank(xs, ys, ts, keys, words.toTypedArray(), scores.toFloatArray())
+        val sortedScores = scores.sortedDescending()
+        return order.take(4).mapIndexed { rank, i -> words[i] to sortedScores[rank] }
     }
 
     override fun getNextValidCodePoints(composedData: ComposedData?): ArrayList<Int> {
@@ -457,7 +503,11 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
             else -> BeamValues.highBeam
         }
 
-        val topK = if(useHighBeam) 4 else 1
+        // at gesture end, take a longer list and re-rank it by gesture shape.
+        val shapeRerank = useHighBeam && !isMultiSwipe && context.getSetting(SwipeShapeRerankSetting)
+                && shapeRerankApplies(appliedLayoutInfo, locale)
+        if(shapeRerank) SwipeShapeReranker.setStrict(context.getSetting(SwipeShapeStrictSetting))
+        val topK = if(useHighBeam) (if(shapeRerank) SHAPE_RERANK_TOP_K else 4) else 1
 
         val results = synchronized(BinaryDictionary.sTrieUsageLock) {
             if(appliedTries?.isEmpty() != false) {
@@ -508,16 +558,64 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
             Log.d("SwipeDecoderDictionary", "outputs = ${results.joinToString { "Word(\"${it.word}\", score=${it.score}, lm=${it.lmScore}, ctc=${it.ctcScore})" }}")
         }
 
-        val list = ArrayList<SuggestedWords.SuggestedWordInfo>(results.size)
-        results.forEach {
+        val ranked: List<Pair<String, Float>> = if(shapeRerank && results.size > 1) {
+            shapeReranked(segments.first(), kb, results.map { it.word }, results.map { it.score })
+        } else {
+            results.map { it.word to it.score }
+        }
+
+        val list = ArrayList<SuggestedWords.SuggestedWordInfo>(ranked.size)
+        ranked.forEach { (word, score) ->
             list.add(SuggestedWords.SuggestedWordInfo(
-                it.word, "", (it.score * 1000.0f + 10000.0f).toInt(), SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
+                word, "", (score * 1000.0f + 10000.0f).toInt(), SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
             ).apply {
                 mOriginatesFromSwipeModel = true
             })
         }
 
+        if(!isMultiSwipe && locale.language in ONE_LETTER_LANGUAGES && context.getSetting(OneLetterSwipeSetting)) {
+            oneLetterWordForShortGesture(segments.first(), kb)?.let { word ->
+                list.removeAll { it.mWord.equals(word, ignoreCase = true) }
+                val topScore = list.maxOfOrNull { it.mScore } ?: 10000
+                list.add(0, SuggestedWords.SuggestedWordInfo(
+                    word, "", topScore + 1, SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
+                ).apply {
+                    mOriginatesFromSwipeModel = true
+                })
+            }
+        }
+
         return list
+    }
+
+    /**
+     * Returns "a" or "I" when a single gesture barely moves and sits over the a or i key.
+     * Uses raw pointer coordinates in keyboard pixels, never a smoothed path, because
+     * smoothing can change a short gesture's length and direction.
+     */
+    private fun oneLetterWordForShortGesture(seg: InputPointers.GestureSegment, kb: Keyboard): String? {
+        val n = seg.x.length
+        if(n == 0) return null
+        val xs = seg.x.primitiveArray; val ys = seg.y.primitiveArray
+        var length = 0.0f
+        for(i in 1 until n) {
+            val dx = (xs[i] - xs[i - 1]).toFloat(); val dy = (ys[i] - ys[i - 1]).toFloat()
+            length += kotlin.math.sqrt(dx * dx + dy * dy)
+        }
+        val keyWidth = kb.mMostCommonKeyWidth.toFloat()
+        if(keyWidth <= 0f || length >= ONE_LETTER_MAX_PATH_KEY_WIDTHS * keyWidth) return null
+
+        var cx = 0.0f; var cy = 0.0f
+        for(i in 0 until n) { cx += xs[i]; cy += ys[i] }
+        cx /= n; cy /= n
+
+        val nearest = kb.sortedKeys
+            .filter { Character.isLetter(it.swipeCode) }
+            .minByOrNull {
+                val kx = it.x + it.width / 2.0f - cx; val ky = it.y + it.height / 2.0f - cy
+                kx * kx + ky * ky
+            } ?: return null
+        return ONE_LETTER_WORDS[Character.toLowerCase(nearest.swipeCode)]
     }
 
     data class PendingLayoutInfo(val layout: LayoutInfoForModel, val tries: List<Long>)
@@ -558,3 +656,22 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
         appliedTries = null
     }
 }
+
+// SwipeShapeReranker: re-rank the swipe decoder's list using the gesture's shape (path length
+// against each word's length, end points, headings, ...). Offline on 23,355 real held-out swipes
+// (swipe.futo.org swipe-2): top-1 90.25% -> 93.07%; on swipe-5: 91.02% -> 92.67%.
+/**
+ * The shape re-ranker's weights were fitted to the scores of FUTO's English decoder and context
+ * model. On the generic decoder path it loses: swipe-5 German -1.3 to -3.0 points, Spanish -2.7,
+ * French -0.8 to -1.5, and English itself -1.8. So it runs only when that decoder is applied.
+ */
+internal fun shapeRerankApplies(layout: LayoutInfoForModel, locale: Locale): Boolean =
+    layout.decoder.isNotEmpty() && locale.language == "en"
+
+val SwipeShapeRerankSetting = SettingsKey(booleanPreferencesKey("swipe_shape_rerank"), true)
+
+/** Swipe shape re-ranking overturns the decoder's first word only on a larger lead (0.5, not 0.15). */
+val SwipeShapeStrictSetting = SettingsKey(booleanPreferencesKey("swipe_shape_strict"), true)
+
+/** How many decoder candidates the shape re-ranker looks at (the decoder's beam stays 300). */
+const val SHAPE_RERANK_TOP_K = 16

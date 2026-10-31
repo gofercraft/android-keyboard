@@ -16,6 +16,8 @@
 
 package org.futo.inputmethod.keyboard;
 
+import android.graphics.Rect;
+
 import org.futo.inputmethod.latin.settings.Settings;
 import org.futo.inputmethod.latin.settings.SettingsValues;
 
@@ -150,7 +152,30 @@ public class KeyDetector {
                 primaryKey = key;
             }
         }
+
+        // Rounded row positions can leave 1px strips that belong to no hitbox (for example
+        // y=312 between rows ending at 312 and starting at 313). A tap there used to be dropped
+        // silently; give it to the nearest key instead, if it is very close to that key's hitbox.
+        if (primaryKey == null) {
+            final int tolerance = Math.max(2, mKeyboard.mMostCommonKeyHeight / 8);
+            float minGap = Float.POSITIVE_INFINITY;
+            for (final Key key : mKeyboard.getNearestKeys(touchX, touchY)) {
+                final float gap = distanceToHitBox(key.getHitBox(), touchX, touchY);
+                if (gap <= tolerance && gap < minGap) {
+                    minGap = gap;
+                    primaryKey = key;
+                }
+            }
+        }
         return primaryKey;
+    }
+
+    // Package-visible for KeyDetectorGapTests
+    static float distanceToHitBox(final Rect box, final int x, final int y) {
+        // Rect.contains excludes the right and bottom edges, so treat them as outside by one pixel
+        final int dx = x < box.left ? box.left - x : (x >= box.right ? x - box.right + 1 : 0);
+        final int dy = y < box.top ? box.top - y : (y >= box.bottom ? y - box.bottom + 1 : 0);
+        return (float) Math.sqrt(dx * dx + dy * dy);
     }
 
     public void updateBoostedCodePoints(@Nullable Set<Integer> validNextCodePoints) {

@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import org.futo.inputmethod.latin.DisplayTop4Setting
 import org.futo.inputmethod.latin.LegacySwipeSetting
+import org.futo.inputmethod.latin.OneLetterSwipeSetting
 import org.futo.inputmethod.latin.R
 import org.futo.inputmethod.latin.RichInputMethodSubtype
 import org.futo.inputmethod.latin.Subtypes
@@ -56,6 +57,7 @@ import org.futo.inputmethod.latin.uix.settings.useDataStore
 import org.futo.inputmethod.latin.uix.settings.useDataStoreValue
 import org.futo.inputmethod.latin.uix.settings.userSettingDecorationOnly
 import org.futo.inputmethod.latin.uix.settings.userSettingNavigationItem
+import org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore
 import org.futo.inputmethod.latin.uix.settings.userSettingToggleSharedPrefs
 import org.futo.inputmethod.latin.uix.suggestionStyleAlternative
 import org.futo.inputmethod.latin.uix.suggestionStylePrimary
@@ -225,11 +227,29 @@ val SwipeMenu = UserSettingsMenu(
             default = {true},
         ),
 
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_shape_strict,
+            subtitle = R.string.swipe_settings_shape_strict_subtitle,
+            setting = org.futo.inputmethod.latin.SwipeShapeStrictSetting,
+        ),
+
+        org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore(
+            title = R.string.swipe_settings_shape_rerank,
+            subtitle = R.string.swipe_settings_shape_rerank_subtitle,
+            setting = org.futo.inputmethod.latin.SwipeShapeRerankSetting,
+        ),
+
         userSettingToggleSharedPrefs(
             title = R.string.swipe_settings_sensitive_swipe,
             subtitle = R.string.swipe_settings_sensitive_swipe_subtitle,
             key = Settings.PREF_GESTURE_INPUT_SENSITIVITY,
             default = {false},
+        ),
+
+        userSettingToggleDataStore(
+            title = R.string.swipe_settings_one_letter_swipe,
+            subtitle = R.string.swipe_settings_one_letter_swipe_subtitle,
+            setting = OneLetterSwipeSetting,
         ),
 
         // KASROZ is primarily for English and the menu isn't translated, so it's hidden if user

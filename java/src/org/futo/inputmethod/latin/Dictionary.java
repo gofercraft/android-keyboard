@@ -65,6 +65,8 @@ public abstract class Dictionary {
     public static final String TYPE_USER_HISTORY = "history";
     public static final String TYPE_EMOJI = "emoji";
     public static final String TYPE_EMAIL = "email";
+    // Read-only supplementary word list shipped with the app (SupplementDictionary).
+    public static final String TYPE_SUPPLEMENT = "supplement";
 
     public final String mDictType;
     // The locale for this dictionary. May be null if unknown (phony dictionary for example).

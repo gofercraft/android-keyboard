@@ -86,6 +86,7 @@ import org.futo.inputmethod.accessibility.AccessibilityUtils
 import org.futo.inputmethod.engine.IMESettingsMenu
 import org.futo.inputmethod.latin.HideKeyboardWhenHardKeyboardConnected
 import org.futo.inputmethod.latin.R
+import org.futo.inputmethod.latin.xlm.SwappedLetterCorrectionSetting
 import org.futo.inputmethod.latin.settings.LongPressKey
 import org.futo.inputmethod.latin.settings.LongPressKeyLayoutSetting
 import org.futo.inputmethod.latin.settings.Settings
@@ -131,6 +132,7 @@ import org.futo.inputmethod.latin.uix.settings.userSettingToggleDataStore
 import org.futo.inputmethod.latin.uix.settings.userSettingToggleSharedPrefs
 import org.futo.inputmethod.latin.uix.theme.Typography
 import org.futo.inputmethod.v2keyboard.KeyboardSettings
+import org.futo.inputmethod.latin.SupplementDictionarySetting
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 import kotlin.math.sign
@@ -871,6 +873,11 @@ val TypingSettingsMenu = UserSettingsMenu(
                     tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
         ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_supplement_dictionary,
+            subtitle = R.string.typing_settings_supplement_dictionary_subtitle,
+            setting = SupplementDictionarySetting
+        ),
         userSettingToggleSharedPrefs(
             title = R.string.auto_cap,
             subtitle = R.string.auto_cap_summary,
@@ -879,6 +886,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             icon = {
                 Text("Aa", style = Typography.Body.MediumMl, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
+        ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_swapped_letter_correction,
+            subtitle = R.string.typing_settings_swapped_letter_correction_subtitle,
+            setting = SwappedLetterCorrectionSetting
         ),
         userSettingToggleSharedPrefs(
             title = R.string.use_double_space_period,
@@ -889,6 +901,11 @@ val TypingSettingsMenu = UserSettingsMenu(
                 Text(".", style = Typography.Body.MediumMl, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
         ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_tap_shape_rerank,
+            subtitle = R.string.typing_settings_tap_shape_rerank_subtitle,
+            setting = org.futo.inputmethod.latin.xlm.TapShapeRerankSetting
+        ),
         userSettingToggleSharedPrefs(
             title = R.string.typing_settings_delete_pasted_text_on_backspace,
             key = Settings.PREF_BACKSPACE_DELETE_INSERTED_TEXT,
@@ -897,7 +914,7 @@ val TypingSettingsMenu = UserSettingsMenu(
         userSettingToggleSharedPrefs(
             title = R.string.typing_settings_revert_correction_on_backspace,
             key = Settings.PREF_BACKSPACE_UNDO_AUTOCORRECT,
-            default = {true}
+            default = {false}
         ),
         userSettingToggleSharedPrefs(
             title = R.string.popup_on_keypress,

@@ -88,6 +88,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_EMAIL, EmailDictionary.class);
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_USER_HISTORY, UserHistoryDictionary.class);
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_USER, UserBinaryDictionary.class);
+        DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_SUPPLEMENT, SupplementDictionary.class);
     }
 
     private static final String DICT_FACTORY_METHOD_NAME = "getDictionary";
@@ -376,6 +377,9 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         // TODO: Make subDictTypesToUse configurable by resource or a static final list.
         final HashSet<String> subDictTypesToUse = new HashSet<>();
         subDictTypesToUse.add(Dictionary.TYPE_USER);
+        if (SupplementDictionary.isEnabled(context)) {
+            subDictTypesToUse.add(Dictionary.TYPE_SUPPLEMENT);
+        }
 
         // Do not use contacts dictionary if we do not have permissions to read contacts.
         final boolean contactsPermissionGranted = PermissionsUtil.checkAllPermissionsGranted(
@@ -952,6 +956,11 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         return isValidWord(word, ALL_DICTIONARY_TYPES);
     }
 
+    @Override
+    public int getWordFrequency(final String word) {
+        return getFrequency(word);
+    }
+
     private boolean isValidWord(final String word, final String[] dictionariesToCheck) {
         if (TextUtils.isEmpty(word)) {
             return false;
@@ -1138,6 +1147,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
                 dicts.add(group.getDict(Dictionary.TYPE_MAIN));
                 dicts.add(group.getDict(Dictionary.TYPE_USER));
                 dicts.add(group.getDict(Dictionary.TYPE_USER_HISTORY));
+                dicts.add(group.getDict(Dictionary.TYPE_SUPPLEMENT));
 
                 addDictionaryTries(dicts, info.getLetters(), trieArray, allowBadWords);
                 int newLength = trieArray.size();

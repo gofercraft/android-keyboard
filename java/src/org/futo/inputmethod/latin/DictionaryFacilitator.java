@@ -47,6 +47,7 @@ public interface DictionaryFacilitator {
 
     public static final String[] ALL_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_MAIN,
+            Dictionary.TYPE_SUPPLEMENT,
             Dictionary.TYPE_CONTACTS,
             Dictionary.TYPE_USER_HISTORY,
             Dictionary.TYPE_USER,
@@ -56,7 +57,8 @@ public interface DictionaryFacilitator {
     public static final String[] DYNAMIC_DICTIONARY_TYPES = new String[] {
             Dictionary.TYPE_CONTACTS,
             Dictionary.TYPE_USER_HISTORY,
-            Dictionary.TYPE_USER};
+            Dictionary.TYPE_USER,
+            Dictionary.TYPE_SUPPLEMENT};
 
     /**
      * The facilitator will put words into the cache whenever it decodes them.
@@ -178,6 +180,9 @@ public interface DictionaryFacilitator {
     boolean isValidSpellingWord(final String word);
 
     boolean isValidSuggestionWord(final String word);
+
+    /** Highest unigram frequency of the exact word over all dictionaries, or NOT_A_PROBABILITY. */
+    int getWordFrequency(final String word);
 
     boolean clearUserHistoryDictionary(final Context context);
 

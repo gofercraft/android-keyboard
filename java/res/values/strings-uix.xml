@@ -458,6 +458,8 @@
     <string name="typing_settings_title">Typing preferences</string>
     <string name="typing_settings_suggest_emojis">Emoji Suggestions</string>
     <string name="typing_settings_suggest_emojis_subtitle">Suggest emojis while you\'re typing</string>
+    <string name="typing_settings_supplement_dictionary">Everyday extra words</string>
+    <string name="typing_settings_supplement_dictionary_subtitle">Suggest common chat words and abbreviations missing from the main dictionary (idk, TV, lol)</string>
     <string name="typing_settings_vibration_strength">Vibration</string>
     <string name="typing_settings_vibration_strength_default">Default</string>
     <string name="typing_settings_keypress_sound_volume">Sound Volume</string>
@@ -466,6 +468,8 @@
     <string name="typing_settings_keypress_sound_volume_ringer_mode_warning">The sound will not play if your ringer mode is set to silent or vibrate.</string>
     <string name="typing_settings_enable_clipboard_history">Clipboard History</string>
     <string name="typing_settings_enable_clipboard_history_tags">copy, paste</string>
+    <string name="typing_settings_swapped_letter_correction">Fix swapped letters</string>
+    <string name="typing_settings_swapped_letter_correction_subtitle">Correct two letters typed in the wrong order, such as mnoday to Monday</string>
     <string name="typing_settings_delete_pasted_text_on_backspace">Delete pasted/inserted text on backspace</string>
     <string name="typing_settings_revert_correction_on_backspace">Undo autocorrect on backspace</string>
 
@@ -475,6 +479,8 @@
     <string name="typing_settings_auto_space_mode_suggestions2">Immediate space after suggestions</string>
     <string name="typing_settings_auto_space_mode_legacy2">Delayed space after suggestions (legacy mode)</string>
     <string name="typing_settings_auto_space_mode_none2">Disabled (not recommended)</string>
+    <string name="typing_settings_tap_shape_rerank">Use where you tapped</string>
+    <string name="typing_settings_tap_shape_rerank_subtitle">Pick the suggestion whose keys best match where your taps landed</string>
 
     <!-- Misc keyboard settings -->
     <string name="keyboard_settings_title">Keyboard</string>
@@ -541,9 +547,13 @@
     <string name="swipe_settings_title">Swipe Typing</string>
     <string name="swipe_settings_enable_swipe_typing">Enable swipe typing</string>
     <string name="swipe_settings_enable_swipe_typing_subtitle">Allow swiping from key to key to write words.</string>
+    <string name="swipe_settings_shape_rerank">Use swipe shape to pick the word</string>
+    <string name="swipe_settings_shape_rerank_subtitle">Re-rank swipe suggestions by how well each word fits the gesture\'s shape</string>
 
     <string name="swipe_settings_sensitive_swipe">Increase sensitivity</string>
     <string name="swipe_settings_sensitive_swipe_subtitle">Make swipe trigger more often</string>
+    <string name="swipe_settings_one_letter_swipe">One-letter words from short swipes</string>
+    <string name="swipe_settings_one_letter_swipe_subtitle">A very short swipe over a or i types \"a\" or \"I\"</string>
 
     <string name="swipe_settings_kasroz">KASROZ</string>
     <string name="swipe_settings_kasroz_subtitle">The best keyboard layout to swipe</string>
@@ -712,4 +722,6 @@ Default is %1$s</string>
     <string name="personal_dictionary_delete_additional_file">Delete extra dictionary file?</string>
     <!-- %1$s will be replaced with the custom dictionary name -->
     <string name="personal_dictionary_delete_additional_file_text">%1$s will be deleted</string>
+    <string name="swipe_settings_shape_strict">Stricter swipe shape</string>
+    <string name="swipe_settings_shape_strict_subtitle">Shape re-ranking keeps the first suggestion of the decoder unless the shape clearly favours another word. Fewer wrong changes, a few fewer rare-word fixes</string>
 </resources>
