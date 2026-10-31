@@ -544,6 +544,8 @@
 
     <string name="swipe_settings_sensitive_swipe">Increase sensitivity</string>
     <string name="swipe_settings_sensitive_swipe_subtitle">Make swipe trigger more often</string>
+    <string name="swipe_settings_one_letter_swipe">One-letter words from short swipes</string>
+    <string name="swipe_settings_one_letter_swipe_subtitle">A very short swipe over a or i types \"a\" or \"I\"</string>
 
     <string name="swipe_settings_kasroz">KASROZ</string>
     <string name="swipe_settings_kasroz_subtitle">The best keyboard layout to swipe</string>

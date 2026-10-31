@@ -233,6 +233,22 @@ val LegacySwipeSetting = SettingsKey(booleanPreferencesKey("swipe_mode_legacy"),
 val DisplayTop4Setting = SettingsKey(booleanPreferencesKey("swipe_use_top4_suggestions"), true)
 
 val SwipeSpecialDecoderSetting = SettingsKey(booleanPreferencesKey("__experimental_swipe_special_decoder"), true)
+
+// a very short gesture over "a" or "i" means the one-letter word.
+// Offline on 23,355 real held-out swipes: one-letter words 0.5% -> 88.1%, overall top-1 90.25% -> 92.5%.
+val OneLetterSwipeSetting = SettingsKey(booleanPreferencesKey("one_letter_swipe"), true)
+
+/** Gesture shorter than this many key widths (raw, unsmoothed touch points) counts as a one-letter swipe. */
+const val ONE_LETTER_MAX_PATH_KEY_WIDTHS = 0.5f
+
+private val ONE_LETTER_WORDS = mapOf('a'.code to "a", 'i'.code to "I")
+
+/**
+ * Languages whose one-letter swipe words are known. Others get no one-letter word: in French the
+ * short swipe on a means "à" as often as "a" (swipe-5: 8 fixed, 33 broken), and German has none.
+ */
+private val ONE_LETTER_LANGUAGES = setOf("en")
+
 val SwipeLanguageModelSetting = SettingsKey(booleanPreferencesKey("__experimental_swipe_language_model"), true)
 
 @Serializable
@@ -517,7 +533,49 @@ class SwipeDecoderDictionary(val context: Context, val locale: Locale) : Diction
             })
         }
 
+        if(!isMultiSwipe && locale.language in ONE_LETTER_LANGUAGES && context.getSetting(OneLetterSwipeSetting)) {
+            oneLetterWordForShortGesture(segments.first(), kb)?.let { word ->
+                list.removeAll { it.mWord.equals(word, ignoreCase = true) }
+                val topScore = list.maxOfOrNull { it.mScore } ?: 10000
+                list.add(0, SuggestedWords.SuggestedWordInfo(
+                    word, "", topScore + 1, SuggestedWords.SuggestedWordInfo.KIND_CORRECTION, this, 0, 0
+                ).apply {
+                    mOriginatesFromSwipeModel = true
+                })
+            }
+        }
+
         return list
+    }
+
+    /**
+     * Returns "a" or "I" when a single gesture barely moves and sits over the a or i key.
+     * Uses raw pointer coordinates in keyboard pixels, never a smoothed path, because
+     * smoothing can change a short gesture's length and direction.
+     */
+    private fun oneLetterWordForShortGesture(seg: InputPointers.GestureSegment, kb: Keyboard): String? {
+        val n = seg.x.length
+        if(n == 0) return null
+        val xs = seg.x.primitiveArray; val ys = seg.y.primitiveArray
+        var length = 0.0f
+        for(i in 1 until n) {
+            val dx = (xs[i] - xs[i - 1]).toFloat(); val dy = (ys[i] - ys[i - 1]).toFloat()
+            length += kotlin.math.sqrt(dx * dx + dy * dy)
+        }
+        val keyWidth = kb.mMostCommonKeyWidth.toFloat()
+        if(keyWidth <= 0f || length >= ONE_LETTER_MAX_PATH_KEY_WIDTHS * keyWidth) return null
+
+        var cx = 0.0f; var cy = 0.0f
+        for(i in 0 until n) { cx += xs[i]; cy += ys[i] }
+        cx /= n; cy /= n
+
+        val nearest = kb.sortedKeys
+            .filter { Character.isLetter(it.swipeCode) }
+            .minByOrNull {
+                val kx = it.x + it.width / 2.0f - cx; val ky = it.y + it.height / 2.0f - cy
+                kx * kx + ky * ky
+            } ?: return null
+        return ONE_LETTER_WORDS[Character.toLowerCase(nearest.swipeCode)]
     }
 
     data class PendingLayoutInfo(val layout: LayoutInfoForModel, val tries: List<Long>)
