@@ -86,6 +86,7 @@ import org.futo.inputmethod.accessibility.AccessibilityUtils
 import org.futo.inputmethod.engine.IMESettingsMenu
 import org.futo.inputmethod.latin.HideKeyboardWhenHardKeyboardConnected
 import org.futo.inputmethod.latin.R
+import org.futo.inputmethod.latin.xlm.SwappedLetterCorrectionSetting
 import org.futo.inputmethod.latin.settings.LongPressKey
 import org.futo.inputmethod.latin.settings.LongPressKeyLayoutSetting
 import org.futo.inputmethod.latin.settings.Settings
@@ -879,6 +880,11 @@ val TypingSettingsMenu = UserSettingsMenu(
             icon = {
                 Text("Aa", style = Typography.Body.MediumMl, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
+        ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_swapped_letter_correction,
+            subtitle = R.string.typing_settings_swapped_letter_correction_subtitle,
+            setting = SwappedLetterCorrectionSetting
         ),
         userSettingToggleSharedPrefs(
             title = R.string.use_double_space_period,

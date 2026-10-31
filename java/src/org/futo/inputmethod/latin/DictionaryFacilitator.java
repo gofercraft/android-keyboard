@@ -179,6 +179,9 @@ public interface DictionaryFacilitator {
 
     boolean isValidSuggestionWord(final String word);
 
+    /** Highest unigram frequency of the exact word over all dictionaries, or NOT_A_PROBABILITY. */
+    int getWordFrequency(final String word);
+
     boolean clearUserHistoryDictionary(final Context context);
 
     void flushUserHistoryDictionaries();

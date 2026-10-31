@@ -37,6 +37,10 @@ public final class SuggestionResults extends TreeSet<SuggestedWordInfo> {
     // such as {@link NgramContext}.
     public final boolean mIsBeginningOfSentence;
     public final boolean mFirstSuggestionExceedsConfidenceThreshold;
+    // set by the transformer path when a correction rule (for example swapped-letter
+    // correction) has put a suggestion first that should autocorrect on space, even when the
+    // typed word is valid or the score threshold is not met. The vetoes in Suggest still apply.
+    public boolean mForceAutoCorrection = false;
     private final int mCapacity;
 
     public SuggestionResults(final int capacity, final boolean isBeginningOfSentence,

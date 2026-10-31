@@ -201,7 +201,8 @@ public final class Suggest {
         // or if the word had more than one char and was not suggested.
         final boolean allowsToBeAutoCorrected =
                 (SHOULD_AUTO_CORRECT_USING_NON_WHITE_LISTED_SUGGESTION || whitelistedWord != null)
-                || (consideredWord.length() > 1 && (sourceDictionaryOfRemovedWord == null));
+                || (consideredWord.length() > 1 && (sourceDictionaryOfRemovedWord == null))
+                || suggestionResults.mForceAutoCorrection;
 
         final boolean hasAutoCorrection;
         // If correction is not enabled, we never auto-correct. This is for example for when
@@ -255,7 +256,10 @@ public final class Suggest {
             hasAutoCorrection = false;
         } else {
             final SuggestedWordInfo firstSuggestion = suggestionResults.first();
-            if (suggestionResults.mFirstSuggestionExceedsConfidenceThreshold
+            if (suggestionResults.mForceAutoCorrection) {
+                // Decided upstream by another correction rule; other vetoes above still apply.
+                hasAutoCorrection = true;
+            } else if (suggestionResults.mFirstSuggestionExceedsConfidenceThreshold
                     && firstOcurrenceOfTypedWordInSuggestions != 0) {
                 hasAutoCorrection = true;
             } else if (!AutoCorrectionUtils.suggestionExceedsThreshold(
