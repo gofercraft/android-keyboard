@@ -379,7 +379,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         if(DictionaryFacilitatorImpl.swipeDecoderDictionary == null) {
             DictionaryFacilitatorImpl.swipeDecoderDictionary = new SwipeDecoderDictionary(context, Locale.ENGLISH);
         }
-        TaughtWords.setChecker(word -> isTaughtWord(word, TaughtWords.MIN_KEPT));
+        TaughtWords.setChecker(word -> isTaughtWord(word, TaughtWords.isKept(word) ? 1 : TaughtWords.MIN_KEPT));
 
         final HashMap<Locale, ArrayList<String>> existingDictionariesToCleanup = new HashMap<>();
         // TODO: Make subDictTypesToUse configurable by resource or a static final list.
@@ -1086,6 +1086,8 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
             mEmailDictionary.asyncFlushBinaryDictionary();
         }
 
+        TaughtWords.forgetKept(context);
+        KeepRetypedWord.forgetKept(context);
         return clearSubDictionary(Dictionary.TYPE_USER_HISTORY);
     }
 

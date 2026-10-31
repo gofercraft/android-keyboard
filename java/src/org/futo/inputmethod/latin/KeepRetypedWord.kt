@@ -75,6 +75,16 @@ object KeepRetypedWord {
         rejectedTyped = null
     }
 
+    /** "Delete learned words": forget every kept spelling as well. */
+    @OptIn(DelicateCoroutinesApi::class)
+    @JvmStatic
+    fun forgetKept(context: Context) {
+        rejectedTyped = null
+        learnNow = null
+        kept = mutableListOf()
+        GlobalScope.launch { context.setSetting(KeptRetypedWordsSetting.key, "") }
+    }
+
     @JvmStatic
     fun setLearnNow(word: String?) {
         learnNow = word

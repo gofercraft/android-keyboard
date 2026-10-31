@@ -2,8 +2,14 @@ package org.futo.inputmethod.latin
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import org.futo.inputmethod.latin.uix.DataStoreHelper
 import org.futo.inputmethod.latin.uix.SettingsKey
 import org.futo.inputmethod.latin.uix.getSetting
+import org.futo.inputmethod.latin.uix.setSetting
 
 /**
  * keep words the user has taught the keyboard (names, places, slang) ahead of close
@@ -17,6 +23,12 @@ val TaughtWordBoostSetting = SettingsKey(
     true
 )
 
+/** Words the user kept on purpose (TaughtWords.rememberKept), newest last, one per line, as written. */
+val TaughtKeptWordsSetting = SettingsKey(
+    stringPreferencesKey("taught_kept_words"),
+    ""
+)
+
 /** Swipes: weight the user-history trie above the main dictionary (TaughtWords.HISTORY_TRIE_WEIGHT). */
 val HistorySwipeWeightSetting = SettingsKey(
     booleanPreferencesKey("history_swipe_weight"),
@@ -26,6 +38,40 @@ val HistorySwipeWeightSetting = SettingsKey(
 object TaughtWords {
     /** User-history commits before a word counts as taught. */
     const val MIN_KEPT = 2
+
+    /**
+     * A word the user kept on purpose (picked as typed from the strip, an undone autocorrection, or
+     * a retype after deleting one: FUTO's importance-3 commits) is taught from that first keep. An
+     * ordinary commit cannot be told apart from an unnoticed typo, so those still need [MIN_KEPT].
+     * Week harness, arm C, "seen once" rule live: new-word
+     * uses right 77 -> 99 and 75 -> 96 of 170 on two seeds with 0 bad picks when the cache held only
+     * words the person meant; with unnoticed typos cached too, 4 bad picks. This keep-or-2 rule is
+     * the deployable version of that guard.
+     */
+    private const val MAX_REMEMBERED = 300
+    private var kept: MutableList<String>? = null
+
+    @Synchronized private fun keptList(): MutableList<String> = kept ?: DataStoreHelper.getSetting(TaughtKeptWordsSetting)
+        .split('\n').filter { it.isNotEmpty() }.toMutableList().also { kept = it }
+
+    @Synchronized @JvmStatic fun isKept(word: String): Boolean = word.isNotEmpty() && keptList().contains(word)
+
+    @OptIn(DelicateCoroutinesApi::class)
+    @Synchronized @JvmStatic fun rememberKept(context: Context, word: String) {
+        if (word.isEmpty() || word.contains('\n') || !isEnabled(context)) return
+        val list = keptList()
+        list.remove(word)
+        list.add(word)
+        while (list.size > MAX_REMEMBERED) list.removeAt(0)
+        val joined = list.joinToString("\n")
+        GlobalScope.launch { context.setSetting(TaughtKeptWordsSetting.key, joined) }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    @Synchronized @JvmStatic fun forgetKept(context: Context) {
+        kept = mutableListOf()
+        GlobalScope.launch { context.setSetting(TaughtKeptWordsSetting.key, "") }
+    }
 
     /**
      * Taps: promote when ln(top dictionary score / taught word's score) is at most this. Fitted on

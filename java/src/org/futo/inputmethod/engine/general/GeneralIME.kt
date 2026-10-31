@@ -32,6 +32,7 @@ import org.futo.inputmethod.latin.DictionaryFacilitator
 import org.futo.inputmethod.latin.DictionaryFacilitatorProvider
 import org.futo.inputmethod.latin.KeepRetypedWord
 import org.futo.inputmethod.latin.LearnKeptWords
+import org.futo.inputmethod.latin.TaughtWords
 import org.futo.inputmethod.latin.NgramContext
 import org.futo.inputmethod.latin.RichInputMethodManager
 import org.futo.inputmethod.latin.Subtypes.switchToNextLanguage
@@ -142,6 +143,9 @@ class GeneralIME(val helper: IMEHelper) : IMEInterface, WordLearner, SuggestionS
     ) {
         val isWordBlacklisted = SuggestionBlacklist.getCapitalVariants(word, settings.current.mLocale).any { !suggestionBlacklist.isWordOk(it) }
         if(isWordBlacklisted) return
+
+        // TaughtWords: a word kept on purpose is taught from this first keep
+        if(importance >= 3) TaughtWords.rememberKept(context, word)
 
         dictionaryFacilitator.addToUserHistory(
             word, wasCapitalized,
