@@ -889,6 +889,11 @@ val TypingSettingsMenu = UserSettingsMenu(
                 Text(".", style = Typography.Body.MediumMl, color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f))
             }
         ),
+        userSettingToggleDataStore(
+            title = R.string.typing_settings_tap_shape_rerank,
+            subtitle = R.string.typing_settings_tap_shape_rerank_subtitle,
+            setting = org.futo.inputmethod.latin.xlm.TapShapeRerankSetting
+        ),
         userSettingToggleSharedPrefs(
             title = R.string.typing_settings_delete_pasted_text_on_backspace,
             key = Settings.PREF_BACKSPACE_DELETE_INSERTED_TEXT,

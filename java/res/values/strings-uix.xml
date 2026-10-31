@@ -475,6 +475,8 @@
     <string name="typing_settings_auto_space_mode_suggestions2">Immediate space after suggestions</string>
     <string name="typing_settings_auto_space_mode_legacy2">Delayed space after suggestions (legacy mode)</string>
     <string name="typing_settings_auto_space_mode_none2">Disabled (not recommended)</string>
+    <string name="typing_settings_tap_shape_rerank">Use where you tapped</string>
+    <string name="typing_settings_tap_shape_rerank_subtitle">Pick the suggestion whose keys best match where your taps landed</string>
 
     <!-- Misc keyboard settings -->
     <string name="keyboard_settings_title">Keyboard</string>
