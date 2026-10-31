@@ -58,7 +58,10 @@ public interface DictionaryFacilitator {
             Dictionary.TYPE_CONTACTS,
             Dictionary.TYPE_USER_HISTORY,
             Dictionary.TYPE_USER,
-            Dictionary.TYPE_SUPPLEMENT};
+            Dictionary.TYPE_SUPPLEMENT,
+            // Swipe-only: deliberately not in ALL_DICTIONARY_TYPES, so tap suggestions and
+            // validity checks never see it.
+            Dictionary.TYPE_NAMES};
 
     /**
      * The facilitator will put words into the cache whenever it decodes them.

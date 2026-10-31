@@ -746,6 +746,8 @@ Default is %1$s</string>
     <string name="personal_dictionary_delete_additional_file_text">%1$s will be deleted</string>
     <string name="swipe_settings_history_weight">Swipe words you have typed before</string>
     <string name="swipe_settings_history_weight_subtitle">Gives words the keyboard has learned from you more weight when swiping, so names and slang you use can be swiped</string>
+    <string name="swipe_settings_names_dictionary">Swipe names</string>
+    <string name="swipe_settings_names_dictionary_subtitle">Lets you swipe about 25,000 common first names, surnames and place names that are not in the main dictionary</string>
     <string name="swipe_settings_shape_strict">Stricter swipe shape</string>
     <string name="swipe_settings_shape_strict_subtitle">Shape re-ranking keeps the first suggestion of the decoder unless the shape clearly favours another word. Fewer wrong changes, a few fewer rare-word fixes</string>
 </resources>

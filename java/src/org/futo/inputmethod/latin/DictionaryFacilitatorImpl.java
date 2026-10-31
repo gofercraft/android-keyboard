@@ -89,6 +89,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_USER_HISTORY, UserHistoryDictionary.class);
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_USER, UserBinaryDictionary.class);
         DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_SUPPLEMENT, SupplementDictionary.class);
+        DICT_TYPE_TO_CLASS.put(Dictionary.TYPE_NAMES, NamesDictionary.class);
     }
 
     private static final String DICT_FACTORY_METHOD_NAME = "getDictionary";
@@ -101,7 +102,13 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
     private LruCache<String, Boolean> mValidSpellingWordReadCache;
     private LruCache<String, Boolean> mValidSpellingWordWriteCache;
 
-    private static boolean sTriesAreInvalid = false;
+    private static volatile boolean sTriesAreInvalid = false;
+    // NamesDictionary: a dictionary finished loading in the background; rebuild the
+    // swipe tries once, on the next gesture, so its trie is included
+    public static void onBackgroundDictionaryLoaded() {
+        sTriesAreInvalid = true;
+    }
+
     public static void onAnyBinaryDictionaryClosed() {
         sTriesAreInvalid = true;
         swipeDecoderDictionary.invalidateTries();
@@ -381,6 +388,9 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         if (SupplementDictionary.isEnabled(context)) {
             subDictTypesToUse.add(Dictionary.TYPE_SUPPLEMENT);
         }
+        if (NamesDictionary.isEnabled(context)) {
+            subDictTypesToUse.add(Dictionary.TYPE_NAMES);
+        }
 
         // Do not use contacts dictionary if we do not have permissions to read contacts.
         final boolean contactsPermissionGranted = PermissionsUtil.checkAllPermissionsGranted(
@@ -575,6 +585,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
             for (final String dictType : ALL_DICTIONARY_TYPES) {
                 dictionaryGroupToClose.closeDict(dictType);
             }
+            dictionaryGroupToClose.closeDict(Dictionary.TYPE_NAMES);
         }
     }
 
@@ -1128,6 +1139,8 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
     private ArrayList<DictionaryGroup> mTrieCorrespondingGroups;
     // TaughtWords: which swipe tries come from user history
     private ArrayList<Boolean> mTrieIsUserHistory;
+    // NamesDictionary: which swipe tries come from the names list
+    private ArrayList<Boolean> mTrieIsNames;
 
     private float[] getTrieWeights() {
         if(mTrieCorrespondingGroups == null) return new float[0];
@@ -1141,6 +1154,9 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
                     && mTrieIsUserHistory.get(i) && swipeDecoderDictionary != null
                     && TaughtWords.isHistorySwipeWeightEnabled(swipeDecoderDictionary.getContext())) {
                 result[i] *= TaughtWords.HISTORY_TRIE_WEIGHT;
+            }
+            if (mTrieIsNames != null && i < mTrieIsNames.size() && mTrieIsNames.get(i)) {
+                result[i] *= NamesDictionary.TRIE_WEIGHT;
             }
         }
 
@@ -1185,10 +1201,11 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
 
             mTrieCorrespondingGroups = new ArrayList<>();
             mTrieIsUserHistory = new ArrayList<>();
+            mTrieIsNames = new ArrayList<>();
 
             for(DictionaryGroup group : mDictionaryGroups) {
                 final String[] types = { Dictionary.TYPE_MAIN, Dictionary.TYPE_USER,
-                        Dictionary.TYPE_USER_HISTORY, Dictionary.TYPE_SUPPLEMENT };
+                        Dictionary.TYPE_USER_HISTORY, Dictionary.TYPE_SUPPLEMENT, Dictionary.TYPE_NAMES };
                 for(final String type : types) {
                     int prevLength = trieArray.size();
                     ArrayList<Dictionary> dicts = new ArrayList<Dictionary>();
@@ -1200,6 +1217,7 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
                     for(int i=0; i<(newLength - prevLength); i++) {
                         mTrieCorrespondingGroups.add(group);
                         mTrieIsUserHistory.add(Dictionary.TYPE_USER_HISTORY.equals(type));
+                        mTrieIsNames.add(Dictionary.TYPE_NAMES.equals(type));
                     }
                 }
             }

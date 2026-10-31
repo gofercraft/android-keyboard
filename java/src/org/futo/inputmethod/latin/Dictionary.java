@@ -67,6 +67,8 @@ public abstract class Dictionary {
     public static final String TYPE_EMAIL = "email";
     // Read-only supplementary word list shipped with the app (SupplementDictionary).
     public static final String TYPE_SUPPLEMENT = "supplement";
+    // Read-only names list used only by the swipe decoder (NamesDictionary).
+    public static final String TYPE_NAMES = "names";
 
     public final String mDictType;
     // The locale for this dictionary. May be null if unknown (phony dictionary for example).
