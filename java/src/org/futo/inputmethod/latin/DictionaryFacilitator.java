@@ -184,6 +184,9 @@ public interface DictionaryFacilitator {
     /** Highest unigram frequency of the exact word over all dictionaries, or NOT_A_PROBABILITY. */
     int getWordFrequency(final String word);
 
+    /** Highest unigram frequency of any spelling of the word ignoring case, or NOT_A_PROBABILITY. */
+    default int getWordFrequencyIgnoringCase(final String word) { return Dictionary.NOT_A_PROBABILITY; }
+
     /** In user history at least minKept times and not a main-dictionary word (TaughtWords). */
     default boolean isTaughtWord(final String word, final int minKept) { return false; }
 

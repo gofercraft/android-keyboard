@@ -982,6 +982,22 @@ public class DictionaryFacilitatorImpl implements DictionaryFacilitator {
         return getFrequency(word);
     }
 
+    @Override
+    public int getWordFrequencyIgnoringCase(final String word) {
+        if (TextUtils.isEmpty(word)) {
+            return Dictionary.NOT_A_PROBABILITY;
+        }
+        int maxFreq = Dictionary.NOT_A_PROBABILITY;
+        for(DictionaryGroup dictionaryGroup : mDictionaryGroups) {
+            for (final String dictType : ALL_DICTIONARY_TYPES) {
+                final Dictionary dictionary = dictionaryGroup.getDict(dictType);
+                if (dictionary == null) continue;
+                maxFreq = Math.max(maxFreq, dictionary.getMaxFrequencyOfExactMatches(word));
+            }
+        }
+        return maxFreq;
+    }
+
     private boolean isValidWord(final String word, final String[] dictionariesToCheck) {
         if (TextUtils.isEmpty(word)) {
             return false;

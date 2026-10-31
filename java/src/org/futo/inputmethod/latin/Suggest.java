@@ -468,13 +468,27 @@ public final class Suggest {
                 || -1 == info.mWord.indexOf(Constants.CODE_SPACE);
     }
 
+    /**
+     * a word spelt with a lower-case first letter and a capital inside (iPhone, eBay)
+     * keeps that spelling when the first letter is typed with Shift or capitalised at a sentence start.
+     */
+    private static boolean hasInnerCapitalOnly(final String word) {
+        if (word.isEmpty() || !Character.isLowerCase(word.codePointAt(0))) return false;
+        for (int i = Character.charCount(word.codePointAt(0)); i < word.length(); ) {
+            final int c = word.codePointAt(i);
+            if (Character.isUpperCase(c)) return true;
+            i += Character.charCount(c);
+        }
+        return false;
+    }
+
     /* package for test */ static SuggestedWordInfo getTransformedSuggestedWordInfo(
             final SuggestedWordInfo wordInfo, final Locale locale, final boolean isAllUpperCase,
             final boolean isOnlyFirstCharCapitalized, final int trailingSingleQuotesCount) {
         final StringBuilder sb = new StringBuilder(wordInfo.mWord.length());
         if (isAllUpperCase) {
             sb.append(wordInfo.mWord.toUpperCase(locale));
-        } else if (isOnlyFirstCharCapitalized) {
+        } else if (isOnlyFirstCharCapitalized && !hasInnerCapitalOnly(wordInfo.mWord)) {
             sb.append(StringUtils.capitalizeFirstCodePoint(wordInfo.mWord, locale));
         } else {
             sb.append(wordInfo.mWord);
