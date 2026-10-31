@@ -897,7 +897,7 @@ val TypingSettingsMenu = UserSettingsMenu(
         userSettingToggleSharedPrefs(
             title = R.string.typing_settings_revert_correction_on_backspace,
             key = Settings.PREF_BACKSPACE_UNDO_AUTOCORRECT,
-            default = {true}
+            default = {false}
         ),
         userSettingToggleSharedPrefs(
             title = R.string.popup_on_keypress,

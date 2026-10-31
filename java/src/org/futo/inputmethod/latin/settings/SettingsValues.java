@@ -202,7 +202,7 @@ public class SettingsValues {
         mScreenMetrics = Settings.readScreenMetrics(res);
 
         mBackspaceDeletesInsertedText = prefs.getBoolean(Settings.PREF_BACKSPACE_DELETE_INSERTED_TEXT, true);
-        mBackspaceUndoesAutocorrect = prefs.getBoolean(Settings.PREF_BACKSPACE_UNDO_AUTOCORRECT, true);
+        mBackspaceUndoesAutocorrect = prefs.getBoolean(Settings.PREF_BACKSPACE_UNDO_AUTOCORRECT, false);
 
         int legacySpacebarMode = prefs.getInt(Settings.PREF_SPACEBAR_MODE_LEGACY, Settings.SPACEBAR_MODE_SWIPE_CURSOR_LEGACY);
         mSpacebarSwipeMode = prefs.getInt(Settings.PREF_SPACEBAR_SWIPE_MODE,
